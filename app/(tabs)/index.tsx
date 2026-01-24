@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -22,57 +22,42 @@ function FlameIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-function CalendarIcon({ size = 20 }: { size?: number }) {
+function ProteinIcon({ size = 20 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9" stroke={colors.textSecondary} strokeWidth={2} />
       <Path
-        d="M19 4H5C3.89543 4 3 4.89543 3 6V20C3 21.1046 3.89543 22 5 22H19C20.1046 22 21 21.1046 21 20V6C21 4.89543 20.1046 4 19 4Z"
-        stroke={colors.accent}
+        d="M12 7V12L15 14"
+        stroke={colors.textSecondary}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <Path d="M16 2V6" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M8 2V6" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M3 10H21" stroke={colors.accent} strokeWidth={2} />
     </Svg>
   );
 }
 
-function DumbbellIcon({ size = 20 }: { size?: number }) {
+// Workout day indicator dot
+function DayDot({ active }: { active: boolean }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M6.5 6.5L17.5 17.5" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M3 10L10 3" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M14 21L21 14" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M3 6L6 3" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-      <Path d="M18 21L21 18" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function ClockIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="10" stroke={colors.textMuted} strokeWidth={2} />
-      <Path d="M12 6V12L16 14" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function PlusIcon({ size = 24, color = '#FFFFFF' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M12 5V19" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-      <Path d="M5 12H19" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-    </Svg>
+    <View
+      style={[
+        styles.dayDot,
+        active ? styles.dayDotActive : styles.dayDotInactive,
+      ]}
+    />
   );
 }
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile, userStats, refreshUserStats } = useAuthStore();
+  const { userStats, refreshUserStats } = useAuthStore();
+
+  // Protein tracker state (UI mockup - not persisted)
+  const [proteinCurrent, setProteinCurrent] = useState(140);
+  const proteinGoal = 180;
+  const [lastAction, setLastAction] = useState<number | null>(null);
 
   // Refresh user stats when screen loads
   useEffect(() => {
@@ -83,109 +68,138 @@ export default function HomeScreen() {
     router.push('/workout/new');
   };
 
-  const formatLastWorkout = (dateString: string | null) => {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
+  const handleAddProtein = (amount: number) => {
+    setLastAction(amount);
+    setProteinCurrent((prev) => Math.min(prev + amount, 999));
   };
 
+  const handleUndoProtein = () => {
+    if (lastAction !== null) {
+      setProteinCurrent((prev) => Math.max(prev - lastAction, 0));
+      setLastAction(null);
+    }
+  };
+
+  // Mock data for 7-day workout indicators (would come from real data)
+  const last7DaysWorkouts = [false, true, true, false, true, true, false];
+  const workoutsThisWeek = last7DaysWorkouts.filter(Boolean).length;
+
+  // Placeholder workout score
+  const avgWorkoutScore = 82;
+
+  const proteinProgress = Math.min(proteinCurrent / proteinGoal, 1);
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
-    >
-      {/* Welcome Section */}
-      <View style={styles.welcome}>
-        <Text style={styles.greeting}>
-          Welcome back,
-        </Text>
-        <Text style={styles.username}>
-          {profile?.display_name || profile?.username || 'Athlete'}
-        </Text>
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+      {/* Logo */}
+      <Text style={styles.logo}>Momentum</Text>
 
-      {/* Stats Cards */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <FlameIcon />
-          </View>
-          <Text style={styles.statValue}>
-            {userStats?.current_workout_streak || 0}
-          </Text>
-          <Text style={styles.statLabel}>
-            Day Streak
-          </Text>
-        </View>
+      {/* Stats Bar */}
+      <View style={styles.statsBar}>
+        <Text style={styles.statsBarTitle}>Progress Stats (Past 7 Days)</Text>
 
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <CalendarIcon />
+        <View style={styles.statsRow}>
+          {/* Progress Streak */}
+          <View style={styles.statSection}>
+            <View style={styles.statHeader}>
+              <FlameIcon size={14} />
+              <Text style={styles.statHeaderText}>Streak</Text>
+            </View>
+            <Text style={styles.statValue}>
+              {userStats?.current_workout_streak || 0} Days
+            </Text>
           </View>
-          <Text style={styles.statValue}>
-            {userStats?.total_workouts || 0}
-          </Text>
-          <Text style={styles.statLabel}>
-            Workouts
-          </Text>
-        </View>
 
-        <View style={styles.statCard}>
-          <View style={styles.statIconContainer}>
-            <DumbbellIcon />
+          <View style={styles.statDivider} />
+
+          {/* Workouts */}
+          <View style={styles.statSection}>
+            <Text style={styles.statHeaderText}>Workouts</Text>
+            <View style={styles.workoutsRow}>
+              <Text style={styles.statValueLarge}>{workoutsThisWeek}</Text>
+              <View style={styles.dotsContainer}>
+                {last7DaysWorkouts.map((active, index) => (
+                  <DayDot key={index} active={active} />
+                ))}
+              </View>
+            </View>
           </View>
-          <Text style={styles.statValue}>
-            {userStats?.longest_workout_streak || 0}
-          </Text>
-          <Text style={styles.statLabel}>
-            Best Streak
-          </Text>
+
+          <View style={styles.statDivider} />
+
+          {/* Avg Workout Score */}
+          <View style={styles.statSection}>
+            <Text style={styles.statHeaderText}>Avg Score</Text>
+            <Text style={styles.statValueLarge}>{avgWorkoutScore}</Text>
+          </View>
         </View>
       </View>
 
-      {/* Start Workout Button */}
-      <TouchableOpacity style={styles.startButton} onPress={handleStartWorkout}>
-        <PlusIcon />
+      {/* Muscle Diagram - Flexible height */}
+      <View style={styles.muscleContainer}>
+        <Image
+          source={require('@/assets/images/muscle-diagram.png')}
+          style={styles.muscleImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* Protein Tracker */}
+      <View style={styles.proteinSection}>
+        <View style={styles.proteinHeader}>
+          <View style={styles.proteinTitleRow}>
+            <ProteinIcon size={16} />
+            <Text style={styles.proteinTitle}>Protein Tracker</Text>
+          </View>
+          <Text style={styles.proteinValue}>
+            {proteinCurrent} / {proteinGoal}g
+          </Text>
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBackground}>
+            <View
+              style={[styles.progressBarFill, { width: `${proteinProgress * 100}%` }]}
+            />
+          </View>
+          <View style={styles.progressBarKnob} />
+        </View>
+
+        {/* Quick Add Buttons */}
+        <View style={styles.proteinButtons}>
+          <TouchableOpacity
+            style={[styles.proteinButton, !lastAction && styles.proteinButtonDisabled]}
+            onPress={handleUndoProtein}
+            disabled={!lastAction}
+            accessibilityLabel="Undo last protein entry"
+          >
+            <Text style={[styles.proteinButtonText, !lastAction && styles.proteinButtonTextDisabled]}>
+              ← Undo
+            </Text>
+          </TouchableOpacity>
+          {[5, 10, 25, 50].map((amount) => (
+            <TouchableOpacity
+              key={amount}
+              style={styles.proteinButton}
+              onPress={() => handleAddProtein(amount)}
+              accessibilityLabel={`Add ${amount} grams of protein`}
+            >
+              <Text style={styles.proteinButtonText}>+{amount}g</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Start Workout Button - Fixed at bottom */}
+      <TouchableOpacity
+        style={styles.startButton}
+        onPress={handleStartWorkout}
+        accessibilityLabel="Start a new workout"
+      >
         <Text style={styles.startButtonText}>Start Workout</Text>
       </TouchableOpacity>
-
-      {/* Last Workout */}
-      {userStats?.last_workout_at && (
-        <View style={styles.lastWorkoutCard}>
-          <ClockIcon />
-          <View style={styles.lastWorkoutText}>
-            <Text style={styles.lastWorkoutLabel}>
-              Last Workout
-            </Text>
-            <Text style={styles.lastWorkoutValue}>
-              {formatLastWorkout(userStats.last_workout_at as string)}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Streak Info */}
-      {(userStats?.current_workout_streak ?? 0) > 0 && (
-        <View style={styles.streakCard}>
-          <FlameIcon size={24} />
-          <View style={styles.streakText}>
-            <Text style={styles.streakTitle}>
-              {userStats?.current_workout_streak} Day Streak!
-            </Text>
-            <Text style={styles.streakDescription}>
-              Keep it up! Consistency is key to progress.
-            </Text>
-          </View>
-        </View>
-      )}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -193,108 +207,191 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgPrimary,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
+  logo: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.accent,
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  welcome: {
-    marginBottom: 24,
-  },
-  greeting: {
-    fontSize: 16,
-    color: colors.textSecondary,
-  },
-  username: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginTop: 4,
-    color: colors.textPrimary,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
+
+  // Stats Bar
+  statsBar: {
     backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
   },
-  statIconContainer: {
+  statsBarTitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textMuted,
+    textAlign: 'center',
     marginBottom: 8,
   },
+  statsRow: {
+    flexDirection: 'row',
+  },
+  statSection: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statHeaderText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   statValue: {
-    fontSize: 18,
+    fontSize: 14,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    color: colors.textPrimary,
+    marginTop: 2,
+  },
+  statValueLarge: {
+    fontSize: 20,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
-  statLabel: {
-    fontSize: 11,
-    marginTop: 4,
-    color: colors.textSecondary,
+  statDivider: {
+    width: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 6,
   },
+  workoutsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dotsContainer: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  dayDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dayDotActive: {
+    backgroundColor: colors.accent,
+  },
+  dayDotInactive: {
+    backgroundColor: colors.bgTertiary,
+  },
+
+  // Muscle Diagram
+  muscleContainer: {
+    flex: 1,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 12,
+    minHeight: 100,
+  },
+  muscleImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  // Protein Tracker
+  proteinSection: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  proteinHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  proteinTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  proteinTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  proteinValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    color: colors.textPrimary,
+  },
+  progressBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  progressBarBackground: {
+    flex: 1,
+    height: 6,
+    backgroundColor: colors.bgTertiary,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 3,
+  },
+  progressBarKnob: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: colors.accent,
+    marginLeft: -7,
+    borderWidth: 2,
+    borderColor: colors.bgSecondary,
+  },
+  proteinButtons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  proteinButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  proteinButtonDisabled: {
+    opacity: 0.5,
+  },
+  proteinButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  proteinButtonTextDisabled: {
+    color: colors.textMuted,
+  },
+
+  // Start Workout Button
   startButton: {
     backgroundColor: colors.accent,
-    flexDirection: 'row',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 24,
-    gap: 12,
   },
   startButtonText: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  streakCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    gap: 12,
-    backgroundColor: colors.bgSecondary,
-    borderWidth: 1,
-    borderColor: colors.accent + '33',
-  },
-  streakText: {
-    flex: 1,
-  },
-  streakTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.accent,
-  },
-  streakDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  lastWorkoutCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    gap: 12,
-    backgroundColor: colors.bgSecondary,
-  },
-  lastWorkoutText: {
-    flex: 1,
-  },
-  lastWorkoutLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  lastWorkoutValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 2,
     color: colors.textPrimary,
   },
 });
