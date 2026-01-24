@@ -39,8 +39,8 @@ export default function SignInScreen() {
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.logo}>Rep Logic</Text>
-          <Text style={styles.tagline}>Gamify your gains</Text>
+          <Text style={styles.logo}>Momentum</Text>
+          <Text style={styles.tagline}>Keep your momentum and unlock progress</Text>
         </View>
 
         <View style={styles.form}>

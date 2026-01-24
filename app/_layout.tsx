@@ -75,7 +75,7 @@ export default function RootLayout() {
   if (!loaded || !isInitialized) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingLogo}>Rep Logic</Text>
+        <Text style={styles.loadingLogo}>Momentum</Text>
         <ActivityIndicator size="large" color={colors.accent} style={styles.loadingSpinner} />
       </View>
     );

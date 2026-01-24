@@ -208,7 +208,7 @@ export default function ProfileScreen() {
       </TouchableOpacity>
 
       {/* Version */}
-      <Text style={styles.version}>Rep Logic v2.0.0</Text>
+      <Text style={styles.version}>Momentum v1.0.0</Text>
 
       {/* Edit Profile Modal */}
       <EditProfileModal

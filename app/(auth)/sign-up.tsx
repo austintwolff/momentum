@@ -67,8 +67,8 @@ export default function SignUpScreen() {
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.logo}>Rep Logic</Text>
-            <Text style={styles.tagline}>Start your journey</Text>
+            <Text style={styles.logo}>Momentum</Text>
+            <Text style={styles.tagline}>Keep your momentum and unlock progress</Text>
           </View>
 
           <View style={styles.form}>
