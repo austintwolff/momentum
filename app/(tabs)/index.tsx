@@ -96,7 +96,7 @@ export default function HomeScreen() {
 
       {/* Stats Bar */}
       <View style={styles.statsBar}>
-        <Text style={styles.statsBarTitle}>Progress Stats (Past 7 Days)</Text>
+        <Text style={styles.statsBarTitle}>Statistics (Past 7 Days)</Text>
 
         <View style={styles.statsRow}>
           {/* Progress Streak */}
@@ -142,6 +142,20 @@ export default function HomeScreen() {
           style={styles.muscleImage}
           resizeMode="contain"
         />
+      </View>
+
+      {/* Body Map Legend */}
+      <View style={styles.bodyMapSection}>
+        <Text style={styles.bodyMapTitle}>Body Map (Past 7 Days)</Text>
+        <View style={styles.legendContainer}>
+          <Text style={styles.legendLabel}>Untrained</Text>
+          <View style={styles.legendBar}>
+            <View style={styles.legendRed} />
+            <View style={styles.legendYellow} />
+            <View style={styles.legendGreen} />
+          </View>
+          <Text style={styles.legendLabel}>Fully Trained</Text>
+        </View>
       </View>
 
       {/* Protein Tracker */}
@@ -291,15 +305,54 @@ const styles = StyleSheet.create({
   // Muscle Diagram
   muscleContainer: {
     flex: 1,
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 12,
     minHeight: 100,
   },
   muscleImage: {
     width: '100%',
     height: '100%',
+  },
+
+  // Body Map Legend
+  bodyMapSection: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  bodyMapTitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendLabel: {
+    fontSize: 10,
+    color: colors.textMuted,
+  },
+  legendBar: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  legendRed: {
+    flex: 1,
+    backgroundColor: colors.error,
+  },
+  legendYellow: {
+    flex: 1,
+    backgroundColor: colors.warning,
+  },
+  legendGreen: {
+    flex: 1,
+    backgroundColor: colors.success,
   },
 
   // Protein Tracker
