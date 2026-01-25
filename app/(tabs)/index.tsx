@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { useAuthStore } from '@/stores/auth.store';
+import { useProteinStore } from '@/stores/protein.store';
 import { colors } from '@/constants/Colors';
 
 // Custom SVG Icons
@@ -37,6 +38,42 @@ function ProteinIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+function CheckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Polyline
+        points="20 6 9 17 4 12"
+        stroke={colors.accent}
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function MinusIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5 12H19"
+        stroke={colors.textPrimary}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function PlusIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 5V19" stroke={colors.textPrimary} strokeWidth={2.5} strokeLinecap="round" />
+      <Path d="M5 12H19" stroke={colors.textPrimary} strokeWidth={2.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 // Workout day indicator dot
 function DayDot({ active }: { active: boolean }) {
   return (
@@ -54,30 +91,25 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { userStats, refreshUserStats } = useAuthStore();
 
-  // Protein tracker state (UI mockup - not persisted)
-  const [proteinCurrent, setProteinCurrent] = useState(140);
-  const proteinGoal = 180;
-  const [lastAction, setLastAction] = useState<number | null>(null);
+  // Protein tracker state from store
+  const {
+    currentProtein,
+    proteinGoal,
+    selectedIncrement,
+    addProtein,
+    subtractProtein,
+    setSelectedIncrement,
+    checkAndResetDaily,
+  } = useProteinStore();
 
-  // Refresh user stats when screen loads
+  // Refresh user stats and check for daily protein reset when screen loads
   useEffect(() => {
     refreshUserStats();
+    checkAndResetDaily();
   }, []);
 
   const handleStartWorkout = () => {
     router.push('/workout/new');
-  };
-
-  const handleAddProtein = (amount: number) => {
-    setLastAction(amount);
-    setProteinCurrent((prev) => Math.min(prev + amount, 999));
-  };
-
-  const handleUndoProtein = () => {
-    if (lastAction !== null) {
-      setProteinCurrent((prev) => Math.max(prev - lastAction, 0));
-      setLastAction(null);
-    }
   };
 
   // Mock data for 7-day workout indicators (would come from real data)
@@ -87,7 +119,8 @@ export default function HomeScreen() {
   // Placeholder workout score
   const avgWorkoutScore = 82;
 
-  const proteinProgress = Math.min(proteinCurrent / proteinGoal, 1);
+  const proteinProgress = Math.min(currentProtein / proteinGoal, 1);
+  const goalReached = currentProtein >= proteinGoal;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
@@ -165,43 +198,70 @@ export default function HomeScreen() {
             <ProteinIcon size={16} />
             <Text style={styles.proteinTitle}>Protein Tracker</Text>
           </View>
-          <Text style={styles.proteinValue}>
-            {proteinCurrent} / {proteinGoal}g
-          </Text>
+          <View style={styles.proteinValueRow}>
+            {goalReached && <CheckIcon size={16} />}
+            <Text style={[styles.proteinValue, goalReached && styles.proteinValueComplete]}>
+              {currentProtein} / {proteinGoal}g
+            </Text>
+          </View>
         </View>
 
         {/* Progress Bar */}
         <View style={styles.progressBarContainer}>
           <View style={styles.progressBarBackground}>
             <View
-              style={[styles.progressBarFill, { width: `${proteinProgress * 100}%` }]}
+              style={[
+                styles.progressBarFill,
+                { width: `${proteinProgress * 100}%` },
+                goalReached && styles.progressBarFillComplete,
+              ]}
             />
           </View>
-          <View style={styles.progressBarKnob} />
+          <View style={[styles.progressBarKnob, goalReached && styles.progressBarKnobComplete]} />
         </View>
 
-        {/* Quick Add Buttons */}
+        {/* Increment Controls */}
         <View style={styles.proteinButtons}>
+          {/* Minus Button */}
           <TouchableOpacity
-            style={[styles.proteinButton, !lastAction && styles.proteinButtonDisabled]}
-            onPress={handleUndoProtein}
-            disabled={!lastAction}
-            accessibilityLabel="Undo last protein entry"
+            style={[styles.proteinActionButton, currentProtein === 0 && styles.proteinButtonDisabled]}
+            onPress={subtractProtein}
+            disabled={currentProtein === 0}
+            accessibilityLabel="Subtract protein"
           >
-            <Text style={[styles.proteinButtonText, !lastAction && styles.proteinButtonTextDisabled]}>
-              ← Undo
-            </Text>
+            <MinusIcon size={18} />
           </TouchableOpacity>
-          {[5, 10, 25, 50].map((amount) => (
+
+          {/* Increment Selection Buttons */}
+          {([5, 10, 25] as const).map((amount) => (
             <TouchableOpacity
               key={amount}
-              style={styles.proteinButton}
-              onPress={() => handleAddProtein(amount)}
-              accessibilityLabel={`Add ${amount} grams of protein`}
+              style={[
+                styles.proteinIncrementButton,
+                selectedIncrement === amount && styles.proteinIncrementButtonSelected,
+              ]}
+              onPress={() => setSelectedIncrement(amount)}
+              accessibilityLabel={`Select ${amount} gram increment`}
             >
-              <Text style={styles.proteinButtonText}>+{amount}g</Text>
+              <Text
+                style={[
+                  styles.proteinButtonText,
+                  selectedIncrement === amount && styles.proteinButtonTextSelected,
+                ]}
+              >
+                {amount}g
+              </Text>
             </TouchableOpacity>
           ))}
+
+          {/* Plus Button */}
+          <TouchableOpacity
+            style={styles.proteinActionButton}
+            onPress={addProtein}
+            accessibilityLabel="Add protein"
+          >
+            <PlusIcon size={18} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -378,11 +438,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  proteinValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   proteinValue: {
     fontSize: 13,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
+  },
+  proteinValueComplete: {
+    color: colors.accent,
   },
   progressBarContainer: {
     flexDirection: 'row',
@@ -401,6 +469,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderRadius: 3,
   },
+  progressBarFillComplete: {
+    backgroundColor: colors.accent,
+  },
   progressBarKnob: {
     width: 14,
     height: 14,
@@ -410,11 +481,23 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.bgSecondary,
   },
+  progressBarKnobComplete: {
+    backgroundColor: colors.accent,
+  },
   proteinButtons: {
     flexDirection: 'row',
     gap: 6,
   },
-  proteinButton: {
+  proteinActionButton: {
+    width: 44,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proteinIncrementButton: {
     flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 4,
@@ -423,16 +506,20 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
+  proteinIncrementButtonSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
   proteinButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
   proteinButtonText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
-  proteinButtonTextDisabled: {
-    color: colors.textMuted,
+  proteinButtonTextSelected: {
+    color: colors.textPrimary,
   },
 
   // Start Workout Button
