@@ -1,6 +1,8 @@
 // Polyfill for crypto.getRandomValues() needed by uuid
 import 'react-native-get-random-values';
 
+import '../global.css';
+
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
