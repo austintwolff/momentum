@@ -7,6 +7,8 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useProteinStore } from '@/stores/protein.store';
 import { colors } from '@/constants/Colors';
 import { ScoreDial } from '@/components/home/ScoreDial';
+import { WorkoutGoals } from '@/components/home/WorkoutGoals';
+import { useRollingScores } from '@/hooks/useRollingScores';
 
 // Custom SVG Icons for Dials
 function ProgressionIcon({ size = 18 }: { size?: number }) {
@@ -106,11 +108,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { refreshUserStats } = useAuthStore();
 
-  // Score dials - these will be calculated dynamically
-  // TODO: Connect to actual score calculation logic
-  const progressionScore = 80;
-  const loadScore = 72;
-  const consistencyScore = 64;
+  // Rolling scores from 14-day window
+  const { progression, load, consistency } = useRollingScores();
 
   // Protein tracker state from store
   const {
@@ -148,44 +147,24 @@ export default function HomeScreen() {
       {/* Score Dials */}
       <View style={styles.dialsContainer}>
         <ScoreDial
-          value={progressionScore}
+          value={progression}
           label="Progression"
           icon={<ProgressionIcon size={14} />}
         />
         <ScoreDial
-          value={loadScore}
+          value={load}
           label="Load"
           icon={<LoadIcon size={14} />}
         />
         <ScoreDial
-          value={consistencyScore}
+          value={consistency}
           label="Consistency"
           icon={<ConsistencyIcon size={14} />}
         />
       </View>
 
-      {/* Muscle Diagram - Flexible height */}
-      <View style={styles.muscleContainer}>
-        <Image
-          source={require('@/assets/images/muscle-diagram.png')}
-          style={styles.muscleImage}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Body Map Legend */}
-      <View style={styles.bodyMapSection}>
-        <Text style={styles.bodyMapTitle}>Body Map (Past 7 Days)</Text>
-        <View style={styles.legendContainer}>
-          <Text style={styles.legendLabel}>Untrained</Text>
-          <View style={styles.legendBar}>
-            <View style={styles.legendLight} />
-            <View style={styles.legendMid} />
-            <View style={styles.legendDark} />
-          </View>
-          <Text style={styles.legendLabel}>Fully Trained</Text>
-        </View>
-      </View>
+      {/* Workout Goals */}
+      <WorkoutGoals />
 
       {/* Protein Tracker */}
       <View style={styles.proteinSection}>
@@ -294,60 +273,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 32,
     marginBottom: 4,
-  },
-
-  // Muscle Diagram
-  muscleContainer: {
-    flex: 1,
-    minHeight: 120,
-    marginBottom: 10,
-  },
-  muscleImage: {
-    width: '100%',
-    height: '100%',
-  },
-
-  // Body Map Legend
-  bodyMapSection: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
-  },
-  bodyMapTitle: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  legendLabel: {
-    fontSize: 10,
-    color: colors.textMuted,
-  },
-  legendBar: {
-    flex: 1,
-    height: 6,
-    borderRadius: 3,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
-  legendLight: {
-    flex: 1,
-    backgroundColor: colors.textPrimary,
-  },
-  legendMid: {
-    flex: 1,
-    backgroundColor: colors.accentLight,
-  },
-  legendDark: {
-    flex: 1,
-    backgroundColor: colors.accentDark,
   },
 
   // Protein Tracker
