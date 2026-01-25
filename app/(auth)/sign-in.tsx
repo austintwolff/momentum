@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { showAlert } from '@/lib/alert';
 import { Link } from 'expo-router';
@@ -39,7 +40,11 @@ export default function SignInScreen() {
     >
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.logo}>Momentum</Text>
+          <Image
+            source={require('@/assets/images/momentum-logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.tagline}>Keep your momentum and unlock progress</Text>
         </View>
 
@@ -108,9 +113,9 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   logo: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.accent,
+    width: '60%',
+    height: 60,
+    alignSelf: 'center',
     marginBottom: 8,
   },
   tagline: {

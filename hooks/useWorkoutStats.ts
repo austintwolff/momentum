@@ -6,6 +6,7 @@ interface WorkoutStats {
   workoutsThisWeek: number;
   weeklyWorkoutDays: boolean[]; // Mon-Sun, true if worked out that day
   streak: number; // Days without skipping more than one day
+  avgScore: number; // Average workout score this week
   isLoading: boolean;
 }
 
@@ -81,6 +82,7 @@ export function useWorkoutStats(): WorkoutStats {
     workoutsThisWeek: 0,
     weeklyWorkoutDays: [false, false, false, false, false, false, false],
     streak: 0,
+    avgScore: 0,
     isLoading: true,
   });
 
@@ -90,6 +92,7 @@ export function useWorkoutStats(): WorkoutStats {
         workoutsThisWeek: 0,
         weeklyWorkoutDays: [false, false, false, false, false, false, false],
         streak: 0,
+        avgScore: 0,
         isLoading: false,
       });
       return;
@@ -98,10 +101,10 @@ export function useWorkoutStats(): WorkoutStats {
     try {
       const weekStart = getWeekStartMonday();
 
-      // Fetch workouts this week for the workout counter and day dots
+      // Fetch workouts this week for the workout counter, day dots, and avg score
       const { data: weekWorkouts, error: weekError } = await (supabase
         .from('workout_sessions') as any)
-        .select('completed_at')
+        .select('completed_at, workout_score')
         .eq('user_id', user.id)
         .gte('completed_at', weekStart.toISOString())
         .order('completed_at', { ascending: true });
@@ -113,17 +116,27 @@ export function useWorkoutStats(): WorkoutStats {
       // Calculate which days of the week had workouts (Mon=0, Sun=6)
       const weeklyWorkoutDays = [false, false, false, false, false, false, false];
       const workoutDatesThisWeek: Date[] = [];
+      const scores: number[] = [];
 
       if (weekWorkouts) {
-        weekWorkouts.forEach((workout: { completed_at: string }) => {
+        weekWorkouts.forEach((workout: { completed_at: string; workout_score: number | null }) => {
           const date = new Date(workout.completed_at);
           workoutDatesThisWeek.push(date);
 
           let dayIndex = date.getDay() - 1; // Convert: Sun=0 -> Mon=0
           if (dayIndex < 0) dayIndex = 6; // Sunday becomes 6
           weeklyWorkoutDays[dayIndex] = true;
+
+          if (workout.workout_score != null) {
+            scores.push(workout.workout_score);
+          }
         });
       }
+
+      // Calculate average score
+      const avgScore = scores.length > 0
+        ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length)
+        : 0;
 
       // Fetch all workout dates for streak calculation (last 60 days should be enough)
       const sixtyDaysAgo = new Date();
@@ -150,6 +163,7 @@ export function useWorkoutStats(): WorkoutStats {
         workoutsThisWeek: workoutDatesThisWeek.length,
         weeklyWorkoutDays,
         streak,
+        avgScore,
         isLoading: false,
       });
     } catch (error) {

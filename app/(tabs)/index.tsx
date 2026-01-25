@@ -2,23 +2,49 @@ import { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Svg, { Path, Circle, Polyline } from 'react-native-svg';
+import Svg, { Path, Circle, Polyline, Rect } from 'react-native-svg';
 import { useAuthStore } from '@/stores/auth.store';
 import { useProteinStore } from '@/stores/protein.store';
-import { useWorkoutStats } from '@/hooks/useWorkoutStats';
 import { colors } from '@/constants/Colors';
+import { ScoreDial } from '@/components/home/ScoreDial';
 
-// Custom SVG Icons
-function FlameIcon({ size = 20 }: { size?: number }) {
+// Custom SVG Icons for Dials
+function ProgressionIcon({ size = 18 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="4" y="14" width="4" height="6" rx="1" fill={colors.textSecondary} />
+      <Rect x="10" y="10" width="4" height="10" rx="1" fill={colors.textSecondary} />
+      <Rect x="16" y="4" width="4" height="16" rx="1" fill={colors.textSecondary} />
+    </Svg>
+  );
+}
+
+function LoadIcon({ size = 18 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C8.5 5.5 8 8.5 9 11C7 10 6 7.5 6 7.5C3.5 11 4 15 6 18C4.5 17 3 15.5 3 15.5C3.5 19 7.5 22 12 22Z"
-        fill={colors.accent}
+        d="M6 4H8V6H16V4H18V6H19C19.5523 6 20 6.44772 20 7V9H4V7C4 6.44772 4.44772 6 5 6H6V4Z"
+        fill={colors.textSecondary}
       />
       <Path
-        d="M12 22C14.5 22 16 20 16 17.5C16 15 14 13 12 11C10 13 8 15 8 17.5C8 20 9.5 22 12 22Z"
-        fill={colors.accentLight}
+        d="M4 10H20V17C20 18.1046 19.1046 19 18 19H6C4.89543 19 4 18.1046 4 17V10Z"
+        fill={colors.textSecondary}
+      />
+    </Svg>
+  );
+}
+
+function ConsistencyIcon({ size = 18 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9" stroke={colors.textSecondary} strokeWidth={2} />
+      <Polyline
+        points="8 12 11 15 16 9"
+        stroke={colors.textSecondary}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
       />
     </Svg>
   );
@@ -75,25 +101,16 @@ function PlusIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-// Workout day indicator dot
-function DayDot({ active }: { active: boolean }) {
-  return (
-    <View
-      style={[
-        styles.dayDot,
-        active ? styles.dayDotActive : styles.dayDotInactive,
-      ]}
-    />
-  );
-}
-
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { refreshUserStats } = useAuthStore();
 
-  // Workout stats (workouts this week, streak)
-  const { workoutsThisWeek, weeklyWorkoutDays, streak } = useWorkoutStats();
+  // Score dials - these will be calculated dynamically
+  // TODO: Connect to actual score calculation logic
+  const progressionScore = 80;
+  const loadScore = 72;
+  const consistencyScore = 64;
 
   // Protein tracker state from store
   const {
@@ -116,56 +133,35 @@ export default function HomeScreen() {
     router.push('/workout/new');
   };
 
-  // Placeholder workout score
-  const avgWorkoutScore = 82;
-
   const proteinProgress = Math.min(currentProtein / proteinGoal, 1);
   const goalReached = currentProtein >= proteinGoal;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+    <View style={[styles.container, { paddingTop: insets.top - 8 }]}>
       {/* Logo */}
-      <Text style={styles.logo}>Momentum</Text>
+      <Image
+        source={require('@/assets/images/momentum-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
 
-      {/* Stats Bar */}
-      <View style={styles.statsBar}>
-        <Text style={styles.statsBarTitle}>Statistics (This Week)</Text>
-
-        <View style={styles.statsRow}>
-          {/* Progress Streak */}
-          <View style={styles.statSection}>
-            <View style={styles.statHeader}>
-              <FlameIcon size={14} />
-              <Text style={styles.statHeaderText}>Streak</Text>
-            </View>
-            <Text style={styles.statValue}>
-              {streak} Days
-            </Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          {/* Workouts */}
-          <View style={styles.statSection}>
-            <Text style={styles.statHeaderText}>Workouts</Text>
-            <View style={styles.workoutsRow}>
-              <Text style={styles.statValueLarge}>{workoutsThisWeek}</Text>
-              <View style={styles.dotsContainer}>
-                {weeklyWorkoutDays.map((active, index) => (
-                  <DayDot key={index} active={active} />
-                ))}
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          {/* Avg Workout Score */}
-          <View style={styles.statSection}>
-            <Text style={styles.statHeaderText}>Avg Score</Text>
-            <Text style={styles.statValueLarge}>{avgWorkoutScore}</Text>
-          </View>
-        </View>
+      {/* Score Dials */}
+      <View style={styles.dialsContainer}>
+        <ScoreDial
+          value={progressionScore}
+          label="Progression"
+          icon={<ProgressionIcon size={14} />}
+        />
+        <ScoreDial
+          value={loadScore}
+          label="Load"
+          icon={<LoadIcon size={14} />}
+        />
+        <ScoreDial
+          value={consistencyScore}
+          label="Consistency"
+          icon={<ConsistencyIcon size={14} />}
+        />
       </View>
 
       {/* Muscle Diagram - Flexible height */}
@@ -183,9 +179,9 @@ export default function HomeScreen() {
         <View style={styles.legendContainer}>
           <Text style={styles.legendLabel}>Untrained</Text>
           <View style={styles.legendBar}>
-            <View style={styles.legendRed} />
-            <View style={styles.legendYellow} />
-            <View style={styles.legendGreen} />
+            <View style={styles.legendLight} />
+            <View style={styles.legendMid} />
+            <View style={styles.legendDark} />
           </View>
           <Text style={styles.legendLabel}>Fully Trained</Text>
         </View>
@@ -282,90 +278,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgPrimary,
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
   logo: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.accent,
-    textAlign: 'center',
-    marginBottom: 12,
+    width: '90%',
+    height: 128,
+    alignSelf: 'center',
+    marginBottom: -16,
   },
 
-  // Stats Bar
-  statsBar: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 12,
-  },
-  statsBarTitle: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  statsRow: {
+  // Score Dials
+  dialsContainer: {
     flexDirection: 'row',
-  },
-  statSection: {
-    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statHeaderText: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  statValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    color: colors.textPrimary,
-    marginTop: 2,
-  },
-  statValueLarge: {
-    fontSize: 20,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    color: colors.textPrimary,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 6,
-  },
-  workoutsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  dayDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  dayDotActive: {
-    backgroundColor: colors.accent,
-  },
-  dayDotInactive: {
-    backgroundColor: colors.bgTertiary,
+    gap: 32,
+    marginBottom: 4,
   },
 
   // Muscle Diagram
   muscleContainer: {
     flex: 1,
-    minHeight: 100,
+    minHeight: 120,
+    marginBottom: 10,
   },
   muscleImage: {
     width: '100%',
@@ -376,15 +311,15 @@ const styles = StyleSheet.create({
   bodyMapSection: {
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: 10,
+    marginBottom: 10,
   },
   bodyMapTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   legendContainer: {
     flexDirection: 'row',
@@ -402,31 +337,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
   },
-  legendRed: {
+  legendLight: {
     flex: 1,
-    backgroundColor: colors.error,
+    backgroundColor: colors.textPrimary,
   },
-  legendYellow: {
+  legendMid: {
     flex: 1,
-    backgroundColor: colors.warning,
+    backgroundColor: colors.accentLight,
   },
-  legendGreen: {
+  legendDark: {
     flex: 1,
-    backgroundColor: colors.success,
+    backgroundColor: colors.accentDark,
   },
 
   // Protein Tracker
   proteinSection: {
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: 10,
+    marginBottom: 10,
   },
   proteinHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   proteinTitleRow: {
     flexDirection: 'row',
@@ -455,7 +390,7 @@ const styles = StyleSheet.create({
   progressBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   progressBarBackground: {
     flex: 1,
@@ -489,8 +424,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   proteinActionButton: {
-    width: 44,
-    paddingVertical: 8,
+    width: 40,
+    paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
@@ -499,7 +434,7 @@ const styles = StyleSheet.create({
   },
   proteinIncrementButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 4,
     borderRadius: 8,
     borderWidth: 1,
@@ -525,7 +460,7 @@ const styles = StyleSheet.create({
   // Start Workout Button
   startButton: {
     backgroundColor: colors.accent,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
   },

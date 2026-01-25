@@ -4,6 +4,7 @@ import { Database } from '@/types/database';
 import { WeightUnit, lbsToKg } from '@/stores/settings.store';
 import { GoalBucket, POINTS_CONFIG } from '@/lib/points-engine';
 import { updateGoalBucketPR, awardBatchMuscleXp, getRolling7DayMuscleSets } from './baseline.service';
+import { calculateWorkoutScore, saveWorkoutScore, SetData } from './workout-score.service';
 
 type WorkoutSessionInsert = Database['public']['Tables']['workout_sessions']['Insert'];
 type WorkoutSetInsert = Database['public']['Tables']['workout_sets']['Insert'];
@@ -26,6 +27,12 @@ interface SaveWorkoutParams {
 interface SaveWorkoutResult {
   success: boolean;
   sessionId?: string;
+  workoutScore?: number;
+  progressScore?: number;
+  workScore?: number;
+  consistencyScore?: number;
+  eprPrCount?: number;
+  weightPrCount?: number;
   error?: string;
 }
 
@@ -208,7 +215,57 @@ export async function saveWorkoutToDatabase(
       }
     }
 
-    return { success: true, sessionId };
+    // 6. Calculate and save workout score
+    let scoreData: {
+      workoutScore?: number;
+      progressScore?: number;
+      workScore?: number;
+      consistencyScore?: number;
+      eprPrCount?: number;
+      weightPrCount?: number;
+    } = {};
+
+    try {
+      const scoreSetData: SetData[] = exercises
+        .filter((exercise) => !exercise.exercise.id.startsWith('local-'))
+        .flatMap((exercise) =>
+          exercise.sets.map((set) => ({
+            exerciseId: exercise.exercise.id,
+            exerciseName: exercise.exercise.name,
+            weightKg: toKg(set.weight),
+            reps: set.reps,
+            setType: set.setType,
+            isBodyweight: set.isBodyweight,
+            completedAt: set.completedAt,
+          }))
+        );
+
+      if (scoreSetData.length > 0) {
+        const scoreResult = await calculateWorkoutScore({
+          userId,
+          workoutId: sessionId,
+          completedAt,
+          sets: scoreSetData,
+          weightUnit,
+        });
+
+        await saveWorkoutScore(sessionId, scoreResult);
+        scoreData = {
+          workoutScore: scoreResult.finalScore,
+          progressScore: scoreResult.progressScore,
+          workScore: scoreResult.workScore,
+          consistencyScore: scoreResult.consistencyScore,
+          eprPrCount: scoreResult.nEPR,
+          weightPrCount: scoreResult.nWPR,
+        };
+        console.log('[Workout] Score calculated:', scoreResult.finalScore);
+      }
+    } catch (scoreError) {
+      // Don't fail the whole save if scoring fails
+      console.error('Error calculating workout score:', scoreError);
+    }
+
+    return { success: true, sessionId, ...scoreData };
   } catch (error) {
     console.error('Error saving workout:', error);
     return {

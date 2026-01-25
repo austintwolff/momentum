@@ -17,22 +17,15 @@ import { colors } from '@/constants/Colors';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore } from '@/stores/settings.store';
-import { getUserMuscleLevels } from '@/services/baseline.service';
 import { fetchExercisesFromDatabase, saveWorkoutToDatabase } from '@/services/workout.service';
 import { DEFAULT_EXERCISES } from '@/constants/exercises';
-import { MuscleLevelBadge } from '@/components/workout/MuscleLevelBadge';
 import ExercisePicker from '@/components/workout/ExercisePicker';
-import { Exercise, MuscleLevel } from '@/types/database';
+import { Exercise } from '@/types/database';
 import { GoalBucket } from '@/lib/points-engine';
-import {
-  xpForMuscleLevel,
-  MUSCLE_XP_CONFIG,
-  calculateMuscleDecay,
-  estimateExerciseXpGains,
-  EstimatedMuscleXpGain,
-} from '@/lib/muscle-xp';
+import { estimateExerciseXpGains, EstimatedMuscleXpGain } from '@/lib/muscle-xp';
 import { AnimatedMuscleSection } from '@/components/workout/AnimatedMuscleSection';
 import { getRecommendedExercises, getEquipmentType, EquipmentType } from '@/services/recommendation.service';
+import { useWorkoutPreferencesStore } from '@/stores/workout-preferences.store';
 
 const DECK_LIMIT = 15; // Max exercises shown in deck view
 
@@ -174,7 +167,6 @@ export default function ExerciseDeckScreen() {
   const { weightUnit } = useSettingsStore();
   const { activeWorkout, startWorkout, addExercise, cancelWorkout, endWorkout, markExerciseCompleted } = useWorkoutStore();
 
-  const [muscleLevels, setMuscleLevels] = useState<MuscleLevel[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -280,84 +272,25 @@ export default function ExerciseDeckScreen() {
     }, 300);
   }, [activeWorkout, profile?.id, markExerciseCompleted, exercises, workoutMuscleGroups, addExercise]);
 
-  // Get muscle data by group name (with decay applied)
+  // Get muscle data (simplified - no levels)
   const getMuscleData = useCallback((muscleGroup: string) => {
-    const found = muscleLevels.find(
-      m => m.muscle_group.toLowerCase() === muscleGroup.toLowerCase()
-    );
-
-    const storedLevel = found?.current_level || 0;
-    const storedXp = found?.current_xp || 0;
-    const lastTrainedAt = found?.last_trained_at || null;
-
-    // Calculate XP progress as percentage (0-1)
-    const xpNeeded = storedLevel >= MUSCLE_XP_CONFIG.MAX_LEVEL
-      ? 0
-      : xpForMuscleLevel(storedLevel + 1);
-    const storedProgress = xpNeeded > 0 ? storedXp / xpNeeded : 0;
-
-    // Apply decay
-    const decay = calculateMuscleDecay(storedLevel, storedProgress, lastTrainedAt);
-
     return {
-      level: decay.effectiveLevel,
-      progress: decay.effectiveProgress,
-      isDecaying: decay.decayStatus === 'decaying' || decay.decayStatus === 'resting',
+      level: 0,
+      progress: 0,
+      isDecaying: false,
     };
-  }, [muscleLevels]);
+  }, []);
 
-  // Handle muscle XP animation completion - update local state and trigger completion
+  // Handle muscle XP animation completion - trigger exercise completion
   const handleMuscleXpAnimationComplete = useCallback((gains: EstimatedMuscleXpGain[]) => {
     setAnimatingCardId(null);
-
-    // Update local muscleLevels state with new XP values so all cards reflect the change
-    if (gains.length > 0) {
-      setMuscleLevels(prevLevels => {
-        const updated = [...prevLevels];
-        gains.forEach(gain => {
-          const index = updated.findIndex(
-            m => m.muscle_group.toLowerCase() === gain.muscleGroup.toLowerCase()
-          );
-          if (index >= 0) {
-            // Update existing muscle level
-            const xpForNextLevel = gain.endLevel >= MUSCLE_XP_CONFIG.MAX_LEVEL
-              ? 0
-              : xpForMuscleLevel(gain.endLevel + 1);
-            updated[index] = {
-              ...updated[index],
-              current_level: gain.endLevel,
-              current_xp: Math.round(gain.endProgress * xpForNextLevel),
-              last_trained_at: new Date().toISOString(),
-            };
-          } else {
-            // Add new muscle entry
-            const xpForNextLevel = gain.endLevel >= MUSCLE_XP_CONFIG.MAX_LEVEL
-              ? 0
-              : xpForMuscleLevel(gain.endLevel + 1);
-            updated.push({
-              id: `temp-${gain.muscleGroup}`,
-              user_id: profile?.id || '',
-              muscle_group: gain.muscleGroup,
-              current_level: gain.endLevel,
-              current_xp: Math.round(gain.endProgress * xpForNextLevel),
-              total_xp_earned: gain.xpGained,
-              last_trained_at: new Date().toISOString(),
-              decay_applied_at: null,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-          }
-        });
-        return updated;
-      });
-    }
 
     if (pendingCompletion) {
       const { exerciseId, index } = pendingCompletion;
       setPendingCompletion(null);
       handleExerciseComplete(exerciseId, index);
     }
-  }, [pendingCompletion, handleExerciseComplete, profile?.id]);
+  }, [pendingCompletion, handleExerciseComplete]);
 
   // Detect returning from exercise screen
   useFocusEffect(
@@ -409,16 +342,6 @@ export default function ExerciseDeckScreen() {
     }, [activeWorkout, handleExerciseComplete, getMuscleData])
   );
 
-  // Load muscle levels
-  useEffect(() => {
-    async function loadMuscleLevels() {
-      if (!profile?.id) return;
-      const levels = await getUserMuscleLevels(profile.id);
-      setMuscleLevels(levels);
-    }
-    loadMuscleLevels();
-  }, [profile?.id]);
-
   // Initialize workout on mount
   useEffect(() => {
     if (!activeWorkout && !isInitialized) {
@@ -427,7 +350,20 @@ export default function ExerciseDeckScreen() {
     }
   }, [activeWorkout, workoutName, goalMode, isInitialized]);
 
-  // Load exercises and populate deck based on workout type with recommendations
+  // Get workout preferences
+  const { getExercisesForWorkout } = useWorkoutPreferencesStore();
+
+  // Get workout type from workout name (e.g., "Push Day" -> "Push")
+  const workoutType = useMemo(() => {
+    const name = workoutName.toLowerCase();
+    if (name.includes('push')) return 'Push';
+    if (name.includes('pull')) return 'Pull';
+    if (name.includes('leg')) return 'Legs';
+    if (name.includes('full')) return 'Full Body';
+    return '';
+  }, [workoutName]);
+
+  // Load exercises and populate deck based on workout type with user preferences
   useEffect(() => {
     async function loadAndPopulateDeck() {
       // Wait for workout to be initialized and user to be logged in
@@ -459,25 +395,43 @@ export default function ExerciseDeckScreen() {
       // Store all exercises for list view
       setExercises(allExercises);
 
-      // Get recommended exercises using the recommendation engine
-      const recommended = await getRecommendedExercises(
-        profile.id,
-        allExercises,
-        workoutMuscleGroups,
-        [], // No completed exercises yet
-        DECK_LIMIT
-      );
+      // Get user's preferred exercises for this workout type
+      const preferredExerciseNames = workoutType ? getExercisesForWorkout(workoutType) : [];
 
-      // Add recommended exercises to the deck
-      recommended.forEach(exercise => {
+      // Find matching exercises from the pool
+      const preferredExercises = preferredExerciseNames
+        .map(name => allExercises.find(ex => ex.name.toLowerCase() === name.toLowerCase()))
+        .filter((ex): ex is Exercise => ex !== undefined);
+
+      // Add preferred exercises first
+      const addedNames = new Set<string>();
+      preferredExercises.forEach(exercise => {
         addExercise(exercise);
+        addedNames.add(exercise.name.toLowerCase());
       });
+
+      // If we need more exercises to fill the deck, get recommendations
+      const remainingSlots = DECK_LIMIT - preferredExercises.length;
+      if (remainingSlots > 0) {
+        const recommended = await getRecommendedExercises(
+          profile.id,
+          allExercises.filter(ex => !addedNames.has(ex.name.toLowerCase())),
+          workoutMuscleGroups,
+          [], // No completed exercises yet
+          remainingSlots
+        );
+
+        // Add recommended exercises to fill remaining slots
+        recommended.forEach(exercise => {
+          addExercise(exercise);
+        });
+      }
 
       setIsInitialized(true);
     }
 
     loadAndPopulateDeck();
-  }, [activeWorkout, workoutMuscleGroups, isInitialized, addExercise, profile?.id]);
+  }, [activeWorkout, workoutMuscleGroups, isInitialized, addExercise, profile?.id, workoutType, getExercisesForWorkout]);
 
   // Handle exercise selection from picker
   const handleSelectExercise = useCallback((exercise: Exercise) => {
@@ -556,10 +510,17 @@ export default function ExerciseDeckScreen() {
 
               await refreshUserStats();
 
-              // Navigate to summary
+              // Navigate to summary with all workout data
               router.replace({
                 pathname: '/workout/summary',
                 params: {
+                  workoutScore: (saveResult.workoutScore ?? 0).toString(),
+                  progressScore: (saveResult.progressScore ?? 0).toString(),
+                  workScore: (saveResult.workScore ?? 0).toString(),
+                  consistencyScore: (saveResult.consistencyScore ?? 0).toString(),
+                  eprPrCount: (saveResult.eprPrCount ?? 0).toString(),
+                  weightPrCount: (saveResult.weightPrCount ?? 0).toString(),
+                  totalVolume: Math.round(finishedWorkout.totalVolume).toString(),
                   totalSets: finishedWorkout.exercises
                     .reduce((sum, ex) => sum + ex.sets.length, 0)
                     .toString(),

@@ -14,6 +14,17 @@ export interface BaselineSessionEntry {
   reps: number;
 }
 
+// Per-exercise score data stored with workout
+export interface ExerciseScoreData {
+  exerciseId: string;
+  exerciseName: string;
+  didEPRPR: boolean;
+  didWeightPR: boolean;
+  bestTodayE1RM: number | null;
+  baselineE1RMUsed: number | null;
+  closenessRatio: number | null;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -129,6 +140,16 @@ export interface Database {
           total_volume_kg: number;
           total_points: number;
           created_at: string;
+          // Workout Score fields
+          final_score: number | null;
+          progress_score: number | null;
+          work_score: number | null;
+          consistency_score: number | null;
+          effective_set_count: number | null;
+          epr_pr_count: number | null;
+          weight_pr_count: number | null;
+          closeness_aggregate_ratio: number | null;
+          exercise_scores: ExerciseScoreData[] | null;
         };
         Insert: {
           id?: string;
@@ -141,6 +162,16 @@ export interface Database {
           total_volume_kg?: number;
           total_points?: number;
           created_at?: string;
+          // Workout Score fields
+          final_score?: number | null;
+          progress_score?: number | null;
+          work_score?: number | null;
+          consistency_score?: number | null;
+          effective_set_count?: number | null;
+          epr_pr_count?: number | null;
+          weight_pr_count?: number | null;
+          closeness_aggregate_ratio?: number | null;
+          exercise_scores?: ExerciseScoreData[] | null;
         };
         Update: {
           name?: string;
@@ -149,6 +180,16 @@ export interface Database {
           notes?: string | null;
           total_volume_kg?: number;
           total_points?: number;
+          // Workout Score fields
+          final_score?: number | null;
+          progress_score?: number | null;
+          work_score?: number | null;
+          consistency_score?: number | null;
+          effective_set_count?: number | null;
+          epr_pr_count?: number | null;
+          weight_pr_count?: number | null;
+          closeness_aggregate_ratio?: number | null;
+          exercise_scores?: ExerciseScoreData[] | null;
         };
       };
       workout_sets: {
