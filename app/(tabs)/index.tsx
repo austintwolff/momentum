@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { useAuthStore } from '@/stores/auth.store';
 import { useProteinStore } from '@/stores/protein.store';
+import { useWorkoutStats } from '@/hooks/useWorkoutStats';
 import { colors } from '@/constants/Colors';
 
 // Custom SVG Icons
@@ -89,7 +90,10 @@ function DayDot({ active }: { active: boolean }) {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { userStats, refreshUserStats } = useAuthStore();
+  const { refreshUserStats } = useAuthStore();
+
+  // Workout stats (workouts this week, streak)
+  const { workoutsThisWeek, weeklyWorkoutDays, streak } = useWorkoutStats();
 
   // Protein tracker state from store
   const {
@@ -112,10 +116,6 @@ export default function HomeScreen() {
     router.push('/workout/new');
   };
 
-  // Mock data for 7-day workout indicators (would come from real data)
-  const last7DaysWorkouts = [false, true, true, false, true, true, false];
-  const workoutsThisWeek = last7DaysWorkouts.filter(Boolean).length;
-
   // Placeholder workout score
   const avgWorkoutScore = 82;
 
@@ -129,7 +129,7 @@ export default function HomeScreen() {
 
       {/* Stats Bar */}
       <View style={styles.statsBar}>
-        <Text style={styles.statsBarTitle}>Statistics (Past 7 Days)</Text>
+        <Text style={styles.statsBarTitle}>Statistics (This Week)</Text>
 
         <View style={styles.statsRow}>
           {/* Progress Streak */}
@@ -139,7 +139,7 @@ export default function HomeScreen() {
               <Text style={styles.statHeaderText}>Streak</Text>
             </View>
             <Text style={styles.statValue}>
-              {userStats?.current_workout_streak || 0} Days
+              {streak} Days
             </Text>
           </View>
 
@@ -151,7 +151,7 @@ export default function HomeScreen() {
             <View style={styles.workoutsRow}>
               <Text style={styles.statValueLarge}>{workoutsThisWeek}</Text>
               <View style={styles.dotsContainer}>
-                {last7DaysWorkouts.map((active, index) => (
+                {weeklyWorkoutDays.map((active, index) => (
                   <DayDot key={index} active={active} />
                 ))}
               </View>
