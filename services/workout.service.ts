@@ -5,6 +5,8 @@ import { WeightUnit, lbsToKg } from '@/stores/settings.store';
 import { GoalBucket, POINTS_CONFIG } from '@/lib/points-engine';
 import { updateGoalBucketPR, awardBatchMuscleXp, getRolling7DayMuscleSets } from './baseline.service';
 import { calculateWorkoutScore, saveWorkoutScore, SetData } from './workout-score.service';
+import { useRollingScoresStore } from '@/stores/rolling-scores.store';
+import { recalculatePRRecordsAfterDeletion } from './rolling-scores.service';
 
 type WorkoutSessionInsert = Database['public']['Tables']['workout_sessions']['Insert'];
 type WorkoutSetInsert = Database['public']['Tables']['workout_sets']['Insert'];
@@ -265,6 +267,9 @@ export async function saveWorkoutToDatabase(
       console.error('Error calculating workout score:', scoreError);
     }
 
+    // Invalidate rolling scores cache so they're recalculated on next view
+    useRollingScoresStore.getState().invalidate();
+
     return { success: true, sessionId, ...scoreData };
   } catch (error) {
     console.error('Error saving workout:', error);
@@ -450,6 +455,12 @@ export async function deleteWorkout(workoutId: string, userId: string): Promise<
       return { success: false, error: 'Workout not found' };
     }
 
+    // Get the sets before deleting them (to track PR exercises for recalculation)
+    const { data: deletedSets } = await supabase
+      .from('workout_sets')
+      .select('exercise_id, is_pr')
+      .eq('workout_session_id', workoutId) as { data: any[] | null };
+
     // Delete workout sets
     await supabase
       .from('workout_sets')
@@ -483,6 +494,18 @@ export async function deleteWorkout(workoutId: string, userId: string): Promise<
       await (supabase.from('user_stats') as any)
         .update(statsUpdate)
         .eq('user_id', userId);
+    }
+
+    // Invalidate rolling scores cache
+    useRollingScoresStore.getState().invalidate();
+
+    // Recalculate PR records for exercises that had PRs deleted
+    if (deletedSets && deletedSets.length > 0) {
+      const setsForRecalculation = deletedSets.map((s: any) => ({
+        exerciseId: s.exercise_id,
+        isPR: s.is_pr,
+      }));
+      await recalculatePRRecordsAfterDeletion(userId, setsForRecalculation);
     }
 
     return { success: true };

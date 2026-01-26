@@ -16,13 +16,13 @@ interface UseTopExercisesResult {
   isLoading: boolean;
 }
 
-// Map workout type names to filter patterns
-const WORKOUT_TYPE_PATTERNS: Record<string, string[]> = {
-  'Push': ['push'],
-  'Pull': ['pull'],
-  'Legs': ['leg'],
-  'Full Body': ['full'],
-};
+// Map workout type names to filter patterns (order matters - more specific first)
+const WORKOUT_TYPE_PATTERNS: [string, string[]][] = [
+  ['Push', ['push']],
+  ['Pull', ['pull']],
+  ['Legs', ['leg']],
+  ['Full Body', ['full', 'afternoon', 'midday', 'morning', 'evening']],
+];
 
 // Dummy data for testing
 const DUMMY_DATA: Record<string, TopExercise[]> = {
@@ -66,7 +66,7 @@ export function useTopExercises(): UseTopExercisesResult {
         .eq('user_id', user.id)
         .not('completed_at', 'is', null)
         .order('completed_at', { ascending: false })
-        .limit(50);
+        .limit(200);
 
       if (sessionsError) {
         console.error('Error fetching sessions for top exercises:', sessionsError);
@@ -99,16 +99,16 @@ export function useTopExercises(): UseTopExercisesResult {
       }>> = {};
 
       // Initialize for each type
-      Object.keys(WORKOUT_TYPE_PATTERNS).forEach(type => {
+      WORKOUT_TYPE_PATTERNS.forEach(([type]) => {
         typeData[type] = new Map();
       });
 
       sessions?.forEach((session: any) => {
         const sessionName = session.name?.toLowerCase() || '';
 
-        // Determine workout type from session name
+        // Determine workout type from session name (order matters - more specific first)
         let workoutType: string | null = null;
-        for (const [type, patterns] of Object.entries(WORKOUT_TYPE_PATTERNS)) {
+        for (const [type, patterns] of WORKOUT_TYPE_PATTERNS) {
           if (patterns.some(pattern => sessionName.includes(pattern))) {
             workoutType = type;
             break;

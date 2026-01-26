@@ -331,30 +331,25 @@ export default function NewWorkoutScreen() {
 
         {/* Top Exercises List */}
         <View style={styles.exercisesList}>
-          <Text style={styles.exercisesTitle}>Top Exercises</Text>
+          <View style={styles.exercisesHeader}>
+            <Text style={styles.exercisesTitle}>Top Exercises</Text>
+            {topExercises.length > 0 && (
+              <View style={styles.statsHeader}>
+                <Text style={styles.statsHeaderLabel}>best</Text>
+              </View>
+            )}
+          </View>
           {topExercises.length > 0 ? (
-            topExercises.map((exercise, idx) => (
+            topExercises.map((exercise) => (
               <View key={exercise.exerciseId} style={styles.exerciseRow}>
                 <Text style={styles.exerciseName} numberOfLines={1}>
                   {exercise.exerciseName}
                 </Text>
-                <View style={styles.exerciseStats}>
-                  <View style={styles.statBoxContainer}>
-                    {idx === 0 && <Text style={styles.statBoxLabel}>{weightUnit}</Text>}
-                    <View style={styles.statBox}>
-                      <Text style={styles.statBoxText}>
-                        {formatWeight(exercise.bestWeight, exercise.isBodyweight)}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.statMultiplier}>×</Text>
-                  <View style={styles.statBoxContainer}>
-                    {idx === 0 && <Text style={styles.statBoxLabel}>reps</Text>}
-                    <View style={styles.statBox}>
-                      <Text style={styles.statBoxText}>{exercise.bestReps}</Text>
-                    </View>
-                  </View>
-                </View>
+                <Text style={styles.exerciseBest}>
+                  {formatWeight(exercise.bestWeight, exercise.isBodyweight)}
+                  <Text style={styles.exerciseBestMuted}> × </Text>
+                  {exercise.bestReps}
+                </Text>
               </View>
             ))
           ) : (
@@ -668,59 +663,49 @@ const styles = StyleSheet.create({
   exercisesList: {
     flex: 1,
   },
+  exercisesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   exercisesTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
     color: colors.textMuted,
     textTransform: 'uppercase',
-    marginBottom: 8,
     letterSpacing: 0.5,
+  },
+  statsHeader: {
+    alignItems: 'flex-end',
+  },
+  statsHeaderLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: colors.textMuted,
   },
   exerciseRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 4,
   },
   exerciseName: {
     fontSize: 13,
     fontWeight: '500',
     color: colors.textPrimary,
     flex: 1,
-    marginRight: 12,
+    marginRight: 8,
   },
-  exerciseStats: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  statBoxContainer: {
-    alignItems: 'center',
-  },
-  statBoxLabel: {
-    fontSize: 9,
-    fontWeight: '500',
-    color: colors.textMuted,
-    marginBottom: 2,
-    textTransform: 'lowercase',
-  },
-  statBox: {
-    backgroundColor: colors.bgTertiary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    minWidth: 36,
-    alignItems: 'center',
-  },
-  statBoxText: {
-    fontSize: 12,
+  exerciseBest: {
+    fontSize: 13,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
-  statMultiplier: {
-    fontSize: 11,
+  exerciseBestMuted: {
     color: colors.textMuted,
+    fontWeight: '400',
   },
   noExercisesText: {
     fontSize: 13,

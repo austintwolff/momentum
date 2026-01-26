@@ -398,9 +398,15 @@ export default function ExerciseDeckScreen() {
       // Get user's preferred exercises for this workout type
       const preferredExerciseNames = workoutType ? getExercisesForWorkout(workoutType) : [];
 
-      // Find matching exercises from the pool
+      // Find matching exercises from the pool (fuzzy match - DB names may have equipment suffix)
       const preferredExercises = preferredExerciseNames
-        .map(name => allExercises.find(ex => ex.name.toLowerCase() === name.toLowerCase()))
+        .map(name => {
+          const nameLower = name.toLowerCase();
+          // Try exact match first, then prefix match (e.g., "Bench Press" matches "Bench Press (Barbell)")
+          return allExercises.find(ex => ex.name.toLowerCase() === nameLower) ||
+                 allExercises.find(ex => ex.name.toLowerCase().startsWith(nameLower + ' (') ||
+                                         ex.name.toLowerCase().startsWith(nameLower + '('));
+        })
         .filter((ex): ex is Exercise => ex !== undefined);
 
       // Add preferred exercises first

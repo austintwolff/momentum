@@ -8,6 +8,7 @@ import { useProteinStore } from '@/stores/protein.store';
 import { colors } from '@/constants/Colors';
 import { ScoreDial } from '@/components/home/ScoreDial';
 import { WorkoutGoals } from '@/components/home/WorkoutGoals';
+import { TrainingFrequency } from '@/components/home/TrainingFrequency';
 import { useRollingScores } from '@/hooks/useRollingScores';
 
 // Custom SVG Icons for Dials
@@ -166,6 +167,9 @@ export default function HomeScreen() {
       {/* Workout Goals */}
       <WorkoutGoals />
 
+      {/* Training Frequency */}
+      <TrainingFrequency />
+
       {/* Protein Tracker */}
       <View style={styles.proteinSection}>
         <View style={styles.proteinHeader}>
@@ -260,10 +264,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   logo: {
-    width: '90%',
-    height: 128,
+    width: '72%',
+    height: 102,
     alignSelf: 'center',
-    marginBottom: -16,
+    marginBottom: -12,
   },
 
   // Score Dials
@@ -272,7 +276,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 32,
-    marginBottom: 4,
+    marginBottom: 8,
   },
 
   // Protein Tracker
@@ -280,7 +284,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
     padding: 10,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   proteinHeader: {
     flexDirection: 'row',

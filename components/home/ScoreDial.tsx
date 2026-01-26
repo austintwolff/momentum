@@ -3,13 +3,14 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
 
 interface ScoreDialProps {
-  value: number; // 0-100
+  value: number | null; // 0-100, null = uncalibrated (show "—")
   label: string;
   icon: React.ReactNode;
   size?: number;
 }
 
 export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
+  const displayValue = value ?? 0; // Use 0 for arc calculations when null
   const strokeWidth = 3;
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
@@ -20,7 +21,7 @@ export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
   const totalArcDegrees = endAngle - startAngle; // 270 degrees
 
   // Calculate the progress arc end angle
-  const progressDegrees = (value / 100) * totalArcDegrees;
+  const progressDegrees = (displayValue / 100) * totalArcDegrees;
   const progressEndAngle = startAngle + progressDegrees;
 
   // Convert degrees to radians and get path coordinates
@@ -42,7 +43,7 @@ export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
   };
 
   const backgroundArc = createArc(startAngle, endAngle);
-  const progressArc = value > 0 ? createArc(startAngle, progressEndAngle) : '';
+  const progressArc = value !== null && value > 0 ? createArc(startAngle, progressEndAngle) : '';
 
   return (
     <View style={styles.container}>
@@ -57,7 +58,7 @@ export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
             strokeLinecap="round"
           />
           {/* Progress arc */}
-          {value > 0 && (
+          {value !== null && value > 0 && (
             <Path
               d={progressArc}
               stroke={colors.accent}
@@ -84,7 +85,9 @@ export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
 
         {/* Value in center */}
         <View style={styles.valueContainer}>
-          <Text style={styles.value}>{value}</Text>
+          <Text style={[styles.value, value === null && styles.valueUncalibrated]}>
+            {value !== null ? value : '—'}
+          </Text>
         </View>
       </View>
 
@@ -122,6 +125,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
+  },
+  valueUncalibrated: {
+    color: colors.textMuted,
   },
   label: {
     fontSize: 11,

@@ -104,7 +104,7 @@ export function useWorkoutStats(): WorkoutStats {
       // Fetch workouts this week for the workout counter, day dots, and avg score
       const { data: weekWorkouts, error: weekError } = await (supabase
         .from('workout_sessions') as any)
-        .select('completed_at, workout_score')
+        .select('completed_at, final_score')
         .eq('user_id', user.id)
         .gte('completed_at', weekStart.toISOString())
         .order('completed_at', { ascending: true });
@@ -119,7 +119,7 @@ export function useWorkoutStats(): WorkoutStats {
       const scores: number[] = [];
 
       if (weekWorkouts) {
-        weekWorkouts.forEach((workout: { completed_at: string; workout_score: number | null }) => {
+        weekWorkouts.forEach((workout: { completed_at: string; final_score: number | null }) => {
           const date = new Date(workout.completed_at);
           workoutDatesThisWeek.push(date);
 
@@ -127,8 +127,8 @@ export function useWorkoutStats(): WorkoutStats {
           if (dayIndex < 0) dayIndex = 6; // Sunday becomes 6
           weeklyWorkoutDays[dayIndex] = true;
 
-          if (workout.workout_score != null) {
-            scores.push(workout.workout_score);
+          if (workout.final_score != null) {
+            scores.push(workout.final_score);
           }
         });
       }
