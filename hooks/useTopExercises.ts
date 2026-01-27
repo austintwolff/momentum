@@ -157,7 +157,7 @@ export function useTopExercises(): UseTopExercisesResult {
             ...data,
           }))
           .sort((a, b) => b.frequency - a.frequency)
-          .slice(0, 5);
+          .slice(0, 15);
 
         result[type] = sorted;
       }

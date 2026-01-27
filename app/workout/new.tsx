@@ -336,7 +336,7 @@ export default function NewWorkoutScreen() {
             <Text style={styles.exercisesTitle}>Top Exercises</Text>
             {topExercises.length > 0 && (
               <View style={styles.statsHeader}>
-                <Text style={styles.statsHeaderLabel}>best</Text>
+                <Text style={styles.statsHeaderLabel}>PR</Text>
               </View>
             )}
           </View>
