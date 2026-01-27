@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   FlatList,
+  ScrollView,
   Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -158,6 +159,7 @@ export default function NewWorkoutScreen() {
   const [addCardio, setAddCardio] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const isInitialized = useRef(false);
 
   // Combine default and custom workout types
   const allWorkoutTypes = useMemo((): WorkoutTypeCard[] => {
@@ -186,12 +188,18 @@ export default function NewWorkoutScreen() {
     return reordered;
   }, [allWorkoutTypes, getRecommendedType]);
 
-  // Auto-select the recommended (first) type on mount
+  // Keep syncing with first card until user starts scrolling
   useEffect(() => {
-    if (orderedWorkoutTypes.length > 0 && !selectedType) {
+    if (orderedWorkoutTypes.length > 0 && !isInitialized.current) {
       setSelectedType(orderedWorkoutTypes[0].type);
+      setCurrentIndex(0);
     }
-  }, [orderedWorkoutTypes, selectedType]);
+  }, [orderedWorkoutTypes]);
+
+  // Mark as initialized when user starts dragging (replaces unreliable timer)
+  const handleScrollBeginDrag = useCallback(() => {
+    isInitialized.current = true;
+  }, []);
 
   const canStart = selectedType !== null && selectedGoal !== null;
 
@@ -242,21 +250,25 @@ export default function NewWorkoutScreen() {
     return null;
   };
 
-  // Handle card selection from swipe
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems.length > 0) {
-      const index = viewableItems[0].index || 0;
-      setCurrentIndex(index);
-      const centeredCard = orderedWorkoutTypes[index];
+  // Handle card selection from scroll
+  const handleScroll = useCallback((event: any) => {
+    // Skip scroll events until initialized to prevent overriding initial selection
+    if (!isInitialized.current) return;
+
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const cardSize = CARD_WIDTH + CARD_GAP;
+    // Add half card size before dividing to get the centered card
+    const index = Math.floor((offsetX + cardSize / 2) / cardSize);
+    const clampedIndex = Math.max(0, Math.min(index, orderedWorkoutTypes.length - 1));
+
+    if (clampedIndex !== currentIndex) {
+      setCurrentIndex(clampedIndex);
+      const centeredCard = orderedWorkoutTypes[clampedIndex];
       if (centeredCard) {
         setSelectedType(centeredCard.type);
       }
     }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
+  }, [orderedWorkoutTypes, currentIndex]);
 
   // Format weight for display
   const formatWeight = useCallback((weightKg: number | null, isBodyweight: boolean): string => {
@@ -270,7 +282,6 @@ export default function NewWorkoutScreen() {
     const isSelected = selectedType === item.type;
     const isFirst = index === 0;
     const typeStats = stats[item.type];
-    const timesCompleted = typeStats?.timesCompleted || 0;
     const lastScore = typeStats?.lastScore;
     const topExercises = exercisesByType[item.type] || [];
 
@@ -305,24 +316,14 @@ export default function NewWorkoutScreen() {
 
         {/* Card Header */}
         <View style={styles.cardHeader}>
-          <View style={styles.cardTitleRow}>
-            <View style={styles.cardIconContainer}>
-              {renderTypeIcon(item.icon, 28)}
-            </View>
-            <Text style={styles.cardTypeName}>{item.type}</Text>
-          </View>
+          <Text style={[styles.cardTypeName, isSelected && styles.cardTypeNameSelected]}>
+            {item.type}
+          </Text>
 
-          {/* Stats Row */}
-          <View style={styles.cardStatsRow}>
-            <View style={styles.cardStatItem}>
-              <Text style={styles.cardStatValue}>{timesCompleted}</Text>
-              <Text style={styles.cardStatLabel}>Done</Text>
-            </View>
-            <View style={styles.cardStatDivider} />
-            <View style={styles.cardStatItem}>
-              <Text style={styles.cardStatValue}>{lastScore ?? '—'}</Text>
-              <Text style={styles.cardStatLabel}>Score</Text>
-            </View>
+          {/* Last Score */}
+          <View style={styles.cardStatItem}>
+            <Text style={styles.cardStatValue}>{lastScore ?? '—'}</Text>
+            <Text style={styles.cardStatLabel}>Last Score</Text>
           </View>
         </View>
 
@@ -339,22 +340,28 @@ export default function NewWorkoutScreen() {
               </View>
             )}
           </View>
-          {topExercises.length > 0 ? (
-            topExercises.map((exercise) => (
-              <View key={exercise.exerciseId} style={styles.exerciseRow}>
-                <Text style={styles.exerciseName} numberOfLines={1}>
-                  {exercise.exerciseName}
-                </Text>
-                <Text style={styles.exerciseBest}>
-                  {formatWeight(exercise.bestWeight, exercise.isBodyweight)}
-                  <Text style={styles.exerciseBestMuted}> × </Text>
-                  {exercise.bestReps}
-                </Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noExercisesText}>No exercises yet</Text>
-          )}
+          <ScrollView
+            style={styles.exercisesScroll}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
+            {topExercises.length > 0 ? (
+              topExercises.map((exercise) => (
+                <View key={exercise.exerciseId} style={styles.exerciseRow}>
+                  <Text style={styles.exerciseName} numberOfLines={1}>
+                    {exercise.exerciseName}
+                  </Text>
+                  <Text style={styles.exerciseBest}>
+                    {formatWeight(exercise.bestWeight, exercise.isBodyweight)}
+                    <Text style={styles.exerciseBestMuted}> × </Text>
+                    {exercise.bestReps}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noExercisesText}>No exercises yet</Text>
+            )}
+          </ScrollView>
         </View>
       </TouchableOpacity>
     );
@@ -421,8 +428,9 @@ export default function NewWorkoutScreen() {
               snapToInterval={CARD_WIDTH + CARD_GAP}
               decelerationRate="fast"
               contentContainerStyle={styles.deckContent}
-              onViewableItemsChanged={onViewableItemsChanged}
-              viewabilityConfig={viewabilityConfig}
+              onScroll={handleScroll}
+              onScrollBeginDrag={handleScrollBeginDrag}
+              scrollEventThrottle={16}
               onMomentumScrollEnd={handleScrollEnd}
               getItemLayout={(_, index) => ({
                 length: CARD_WIDTH + CARD_GAP,
@@ -619,21 +627,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  cardIconContainer: {},
   cardTypeName: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.textSecondary,
   },
-  cardStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  cardTypeNameSelected: {
+    color: colors.accent,
   },
   cardStatItem: {
     alignItems: 'center',
@@ -649,11 +649,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 1,
   },
-  cardStatDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
-  },
   cardDivider: {
     height: 1,
     backgroundColor: colors.border,
@@ -661,6 +656,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   exercisesList: {
+    flex: 1,
+  },
+  exercisesScroll: {
     flex: 1,
   },
   exercisesHeader: {
