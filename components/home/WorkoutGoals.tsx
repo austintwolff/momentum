@@ -154,40 +154,40 @@ export function WorkoutGoals({}: WorkoutGoalsProps) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   title: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 12,
     color: colors.textMuted,
   },
   goalsList: {
-    gap: 10,
+    gap: 14,
   },
   goalItem: {
-    gap: 6,
+    gap: 8,
   },
   goalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.bgTertiary,
@@ -200,33 +200,33 @@ const styles = StyleSheet.create({
   },
   goalContent: {
     flex: 1,
-    gap: 2,
+    gap: 3,
   },
   goalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   goalLabel: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
   },
   goalDescription: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textPrimary,
   },
   boostBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
     backgroundColor: colors.bgTertiary,
   },
   boostBadgeComplete: {
     backgroundColor: colors.accent,
   },
   boostText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textMuted,
@@ -235,10 +235,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   progressBar: {
-    height: 3,
+    height: 4,
     backgroundColor: colors.bgTertiary,
     borderRadius: 2,
-    marginLeft: 26, // Align with content after checkbox
+    marginLeft: 32, // Align with content after checkbox
     overflow: 'hidden',
   },
   progressFill: {

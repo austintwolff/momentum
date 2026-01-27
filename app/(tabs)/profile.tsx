@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore, kgToLbs, WeightUnit } from '@/stores/settings.store';
+import { useProteinStore } from '@/stores/protein.store';
 import { useWorkoutStats } from '@/hooks/useWorkoutStats';
 import { colors } from '@/constants/Colors';
 import Avatar from '@/components/profile/Avatar';
@@ -85,12 +86,82 @@ function ChevronIcon({ size = 24 }: { size?: number }) {
   );
 }
 
+function ProteinIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="9" stroke={colors.textSecondary} strokeWidth={2} />
+      <Path
+        d="M12 7V12L15 14"
+        stroke={colors.textSecondary}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function CheckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Polyline
+        points="20 6 9 17 4 12"
+        stroke={colors.accent}
+        strokeWidth={3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+function MinusIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M5 12H19"
+        stroke={colors.textPrimary}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function PlusIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 5V19" stroke={colors.textPrimary} strokeWidth={2.5} strokeLinecap="round" />
+      <Path d="M5 12H19" stroke={colors.textPrimary} strokeWidth={2.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, userStats, signOut, updateProfile } = useAuthStore();
   const { weightUnit, setWeightUnit } = useSettingsStore();
   const { workoutsThisWeek, weeklyWorkoutDays, streak, avgScore } = useWorkoutStats();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+
+  // Protein tracker state
+  const {
+    currentProtein,
+    proteinGoal,
+    selectedIncrement,
+    addProtein,
+    subtractProtein,
+    setSelectedIncrement,
+    checkAndResetDaily,
+  } = useProteinStore();
+
+  // Check for daily protein reset when screen loads
+  useEffect(() => {
+    checkAndResetDaily();
+  }, []);
+
+  const proteinProgress = Math.min(currentProtein / proteinGoal, 1);
+  const goalReached = currentProtein >= proteinGoal;
 
   const handleSignOut = () => {
     showAlert(
@@ -194,6 +265,79 @@ export default function ProfileScreen() {
             <Text style={styles.statHeaderText}>Avg Score</Text>
             <Text style={styles.statValueLarge}>{avgScore}</Text>
           </View>
+        </View>
+      </View>
+
+      {/* Protein Tracker */}
+      <View style={styles.proteinSection}>
+        <View style={styles.proteinHeader}>
+          <View style={styles.proteinTitleRow}>
+            <ProteinIcon size={18} />
+            <Text style={styles.proteinTitle}>Protein Tracker</Text>
+          </View>
+          <View style={styles.proteinValueRow}>
+            {goalReached && <CheckIcon size={16} />}
+            <Text style={[styles.proteinValue, goalReached && styles.proteinValueComplete]}>
+              {currentProtein} / {proteinGoal}g
+            </Text>
+          </View>
+        </View>
+
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBackground}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${proteinProgress * 100}%` },
+              ]}
+            />
+          </View>
+          <View style={[styles.progressBarKnob, goalReached && styles.progressBarKnobComplete]} />
+        </View>
+
+        {/* Increment Controls */}
+        <View style={styles.proteinButtons}>
+          {/* Minus Button */}
+          <TouchableOpacity
+            style={[styles.proteinActionButton, currentProtein === 0 && styles.proteinButtonDisabled]}
+            onPress={subtractProtein}
+            disabled={currentProtein === 0}
+            accessibilityLabel="Subtract protein"
+          >
+            <MinusIcon size={18} />
+          </TouchableOpacity>
+
+          {/* Increment Selection Buttons */}
+          {([5, 10, 25] as const).map((amount) => (
+            <TouchableOpacity
+              key={amount}
+              style={[
+                styles.proteinIncrementButton,
+                selectedIncrement === amount && styles.proteinIncrementButtonSelected,
+              ]}
+              onPress={() => setSelectedIncrement(amount)}
+              accessibilityLabel={`Select ${amount} gram increment`}
+            >
+              <Text
+                style={[
+                  styles.proteinButtonText,
+                  selectedIncrement === amount && styles.proteinButtonTextSelected,
+                ]}
+              >
+                {amount}g
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          {/* Plus Button */}
+          <TouchableOpacity
+            style={styles.proteinActionButton}
+            onPress={addProtein}
+            accessibilityLabel="Add protein"
+          >
+            <PlusIcon size={18} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -382,6 +526,109 @@ const styles = StyleSheet.create({
   },
   dayDotInactive: {
     backgroundColor: colors.bgTertiary,
+  },
+  // Protein Tracker
+  proteinSection: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 24,
+  },
+  proteinHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  proteinTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  proteinTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  proteinValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  proteinValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    color: colors.textPrimary,
+  },
+  proteinValueComplete: {
+    color: colors.accent,
+  },
+  progressBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  progressBarBackground: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.bgTertiary,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 4,
+  },
+  progressBarKnob: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.accent,
+    marginLeft: -8,
+    borderWidth: 2,
+    borderColor: colors.bgSecondary,
+  },
+  progressBarKnobComplete: {
+    backgroundColor: colors.accent,
+  },
+  proteinButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  proteinActionButton: {
+    width: 44,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proteinIncrementButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  proteinIncrementButtonSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  proteinButtonDisabled: {
+    opacity: 0.4,
+  },
+  proteinButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  proteinButtonTextSelected: {
+    color: colors.textPrimary,
   },
   section: {
     marginBottom: 24,

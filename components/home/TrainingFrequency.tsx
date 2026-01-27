@@ -166,29 +166,29 @@ export function TrainingFrequency() {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    paddingTop: 12,
-    paddingBottom: 12,
-    marginBottom: 8,
+    borderRadius: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
+    marginBottom: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    marginBottom: 10,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
   },
   subtitle: {
-    fontSize: 11,
+    fontSize: 12,
     color: colors.textMuted,
   },
   scrollContent: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     gap: CARD_GAP,
   },
   card: {
