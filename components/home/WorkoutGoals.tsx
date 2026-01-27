@@ -113,25 +113,25 @@ export function WorkoutGoals({}: WorkoutGoalsProps) {
     {
       icon: <ProgressionGoalIcon />,
       label: 'Progression',
-      description: 'Beat 3 personal records this week',
-      progress: 0.33,
+      description: 'Beat a personal record today',
+      progress: 0,
       isComplete: false,
       boostLabel: '+5',
     },
     {
       icon: <LoadGoalIcon />,
       label: 'Load',
-      description: 'Complete 20 working sets today',
-      progress: 0.65,
+      description: 'Complete 15 working sets today',
+      progress: 0,
       isComplete: false,
       boostLabel: '+5',
     },
     {
       icon: <ConsistencyGoalIcon />,
       label: 'Consistency',
-      description: 'Train 4 days this week',
-      progress: 1,
-      isComplete: true,
+      description: 'Complete a workout today',
+      progress: 0,
+      isComplete: false,
       boostLabel: '+5',
     },
   ];
@@ -139,7 +139,7 @@ export function WorkoutGoals({}: WorkoutGoalsProps) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Workout Goals</Text>
+        <Text style={styles.title}>Daily Goals</Text>
         <Text style={styles.subtitle}>Complete to boost scores</Text>
       </View>
       <View style={styles.goalsList}>
