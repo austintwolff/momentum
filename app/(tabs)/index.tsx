@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { ScoreDial } from '@/components/home/ScoreDial';
 import { WorkoutGoals } from '@/components/home/WorkoutGoals';
 import { TrainingFrequency } from '@/components/home/TrainingFrequency';
 import { useRollingScores } from '@/hooks/useRollingScores';
+import ScoreDetailPopup, { ScoreType } from '@/components/home/ScoreDetailPopup';
 
 // Custom SVG Icons for Dials
 function ProgressionIcon({ size = 18 }: { size?: number }) {
@@ -63,6 +64,28 @@ export default function HomeScreen() {
   // Rolling scores from 14-day window
   const { progression, load, consistency } = useRollingScores();
 
+  // Score detail popup state
+  const [popupVisible, setPopupVisible] = useState(false);
+  const [selectedScoreType, setSelectedScoreType] = useState<ScoreType | null>(null);
+
+  const handleDialPress = (type: ScoreType) => {
+    setSelectedScoreType(type);
+    setPopupVisible(true);
+  };
+
+  const getSelectedScore = (): number | null => {
+    switch (selectedScoreType) {
+      case 'progression':
+        return progression;
+      case 'load':
+        return load;
+      case 'consistency':
+        return consistency;
+      default:
+        return null;
+    }
+  };
+
   // Refresh user stats when screen loads
   useEffect(() => {
     refreshUserStats();
@@ -87,16 +110,19 @@ export default function HomeScreen() {
           value={progression}
           label="Progression"
           icon={<ProgressionIcon size={14} />}
+          onPress={() => handleDialPress('progression')}
         />
         <ScoreDial
           value={load}
           label="Load"
           icon={<LoadIcon size={14} />}
+          onPress={() => handleDialPress('load')}
         />
         <ScoreDial
           value={consistency}
           label="Consistency"
           icon={<ConsistencyIcon size={14} />}
+          onPress={() => handleDialPress('consistency')}
         />
       </View>
 
@@ -117,6 +143,14 @@ export default function HomeScreen() {
       >
         <Text style={styles.startButtonText}>Start Workout</Text>
       </TouchableOpacity>
+
+      {/* Score Detail Popup */}
+      <ScoreDetailPopup
+        visible={popupVisible}
+        scoreType={selectedScoreType}
+        score={getSelectedScore()}
+        onClose={() => setPopupVisible(false)}
+      />
     </View>
   );
 }

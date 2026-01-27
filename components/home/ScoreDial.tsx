@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
 
@@ -7,9 +7,10 @@ interface ScoreDialProps {
   label: string;
   icon: React.ReactNode;
   size?: number;
+  onPress?: () => void;
 }
 
-export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
+export function ScoreDial({ value, label, icon, size = 72, onPress }: ScoreDialProps) {
   const displayValue = value ?? 0; // Use 0 for arc calculations when null
   const strokeWidth = 3;
   const radius = (size - strokeWidth) / 2;
@@ -45,8 +46,8 @@ export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
   const backgroundArc = createArc(startAngle, endAngle);
   const progressArc = value !== null && value > 0 ? createArc(startAngle, progressEndAngle) : '';
 
-  return (
-    <View style={styles.container}>
+  const dialContent = (
+    <>
       <View style={[styles.dialWrapper, { width: size, height: size }]}>
         <Svg width={size} height={size}>
           {/* Background arc */}
@@ -93,8 +94,24 @@ export function ScoreDial({ value, label, icon, size = 72 }: ScoreDialProps) {
 
       {/* Label below */}
       <Text style={styles.label}>{label}</Text>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        style={styles.container}
+        onPress={onPress}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={`View ${label} details`}
+      >
+        {dialContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return <View style={styles.container}>{dialContent}</View>;
 }
 
 const styles = StyleSheet.create({
