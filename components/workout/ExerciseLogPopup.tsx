@@ -228,8 +228,7 @@ export default function ExerciseLogPopup({
         <Pressable style={styles.dialog} onPress={Keyboard.dismiss}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.headerSpacer} />
-            <Text style={styles.title}>{exercise.name}</Text>
+            <Text style={styles.title} numberOfLines={2}>{exercise.name}</Text>
             <TouchableOpacity
               onPress={onClose}
               style={styles.closeButton}
@@ -296,16 +295,36 @@ export default function ExerciseLogPopup({
                 {detailedSets.map((set, index) => {
                   const isUnsaved = !set.isComplete && !set.isEdited;
                   return (
-                    <View key={set.id} style={styles.setRow}>
-                      <Text style={[
-                        styles.setLabel,
-                        set.isComplete && styles.textSaved
-                      ]}>
-                        {index + 1}
-                      </Text>
+                    <View key={set.id} style={styles.setRowContainer}>
+                      {/* Top row: set number, inputs, check button - all aligned */}
+                      <View style={styles.setRow}>
+                        <Text style={[
+                          styles.setLabel,
+                          set.isComplete && styles.textSaved
+                        ]}>
+                          {index + 1}
+                        </Text>
 
-                      {/* Weight first */}
-                      {!isBodyweight && (
+                        {/* Weight first */}
+                        {!isBodyweight && (
+                          <View style={styles.inputWrapper}>
+                            <TextInput
+                              style={[
+                                styles.input,
+                                isUnsaved && styles.inputUnsaved,
+                                set.isComplete && styles.inputSaved,
+                              ]}
+                              placeholder="0"
+                              placeholderTextColor={colors.textMuted}
+                              keyboardType="numeric"
+                              returnKeyType="done"
+                              value={set.weight}
+                              onChangeText={(v) => handleUpdateSet(index, 'weight', v)}
+                            />
+                          </View>
+                        )}
+
+                        {/* Reps second */}
                         <View style={styles.inputWrapper}>
                           <TextInput
                             style={[
@@ -317,48 +336,43 @@ export default function ExerciseLogPopup({
                             placeholderTextColor={colors.textMuted}
                             keyboardType="numeric"
                             returnKeyType="done"
-                            value={set.weight}
-                            onChangeText={(v) => handleUpdateSet(index, 'weight', v)}
+                            value={set.reps}
+                            onChangeText={(v) => handleUpdateSet(index, 'reps', v)}
                           />
+                        </View>
+
+                        <TouchableOpacity
+                          onPress={() => handleToggleSetComplete(index)}
+                          style={styles.checkButton}
+                          accessibilityLabel={set.isComplete ? 'Mark incomplete' : 'Save set'}
+                        >
+                          <CheckCircle checked={set.isComplete} size={28} />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Labels row below inputs */}
+                      <View style={styles.labelsRow}>
+                        <View style={styles.setLabelSpacer} />
+                        {!isBodyweight && (
+                          <View style={styles.inputWrapper}>
+                            <Text style={[
+                              styles.inputLabel,
+                              set.isComplete && styles.textSaved
+                            ]}>
+                              Weight ({weightUnit})
+                            </Text>
+                          </View>
+                        )}
+                        <View style={styles.inputWrapper}>
                           <Text style={[
                             styles.inputLabel,
                             set.isComplete && styles.textSaved
                           ]}>
-                            {weightUnit}
+                            Reps
                           </Text>
                         </View>
-                      )}
-
-                      {/* Reps second */}
-                      <View style={styles.inputWrapper}>
-                        <TextInput
-                          style={[
-                            styles.input,
-                            isUnsaved && styles.inputUnsaved,
-                            set.isComplete && styles.inputSaved,
-                          ]}
-                          placeholder="0"
-                          placeholderTextColor={colors.textMuted}
-                          keyboardType="numeric"
-                          returnKeyType="done"
-                          value={set.reps}
-                          onChangeText={(v) => handleUpdateSet(index, 'reps', v)}
-                        />
-                        <Text style={[
-                          styles.inputLabel,
-                          set.isComplete && styles.textSaved
-                        ]}>
-                          reps
-                        </Text>
+                        <View style={styles.checkButtonSpacer} />
                       </View>
-
-                      <TouchableOpacity
-                        onPress={() => handleToggleSetComplete(index)}
-                        style={styles.checkButton}
-                        accessibilityLabel={set.isComplete ? 'Mark incomplete' : 'Save set'}
-                      >
-                        <CheckCircle checked={set.isComplete} size={28} />
-                      </TouchableOpacity>
                     </View>
                   );
                 })}
@@ -404,41 +418,39 @@ const styles = StyleSheet.create({
     width: DIALOG_WIDTH,
     backgroundColor: colors.bgSecondary,
     borderRadius: 16,
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
     maxHeight: '75%',
   },
   header: {
-    flexDirection: 'row',
+    position: 'relative',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 16,
-  },
-  headerSpacer: {
-    width: 28,
+    paddingHorizontal: 32,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
     textAlign: 'center',
-    flex: 1,
   },
   closeButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
     padding: 4,
   },
   counterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   counterButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: colors.accent,
     alignItems: 'center',
@@ -449,30 +461,31 @@ const styles = StyleSheet.create({
   },
   counterCenter: {
     alignItems: 'center',
-    minWidth: 40,
+    minWidth: 64,
+    marginHorizontal: 12,
   },
   counterNumber: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
   counterLabel: {
-    fontSize: 12,
+    fontSize: 13,
     color: colors.textSecondary,
     marginTop: -2,
   },
   divider: {
     height: 1,
     backgroundColor: colors.border,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   dropdownHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    marginBottom: 8,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 15,
@@ -482,34 +495,43 @@ const styles = StyleSheet.create({
   optionalText: {
     fontSize: 12,
     color: colors.textMuted,
-    marginTop: 2,
+    marginTop: 3,
   },
   setsScroll: {
-    maxHeight: 200,
+    maxHeight: 220,
+  },
+  setRowContainer: {
+    marginBottom: 12,
   },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+  },
+  labelsRow: {
+    flexDirection: 'row',
+    marginTop: 4,
   },
   setLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textMuted,
-    width: 16,
+    width: 20,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
+  setLabelSpacer: {
+    width: 20,
+  },
   inputWrapper: {
     flex: 1,
+    marginHorizontal: 6,
   },
   input: {
-    height: 36,
+    height: 40,
     backgroundColor: colors.bgTertiary,
     borderRadius: 8,
     textAlign: 'center',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     color: colors.textSecondary,
     fontVariant: ['tabular-nums'],
@@ -521,23 +543,27 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   inputLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textMuted,
     textAlign: 'center',
-    marginTop: 2,
   },
   textSaved: {
     color: colors.textSecondary,
   },
   checkButton: {
-    padding: 2,
+    width: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkButtonSpacer: {
+    width: 32,
   },
   addSetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 12,
     marginBottom: 8,
   },
   addSetText: {
@@ -547,10 +573,10 @@ const styles = StyleSheet.create({
   },
   finishButton: {
     backgroundColor: colors.accent,
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 8,
   },
   finishButtonDisabled: {
     backgroundColor: colors.bgTertiary,

@@ -30,45 +30,57 @@ const db = supabase as any;
 
 /**
  * Get or create exercise baseline for a user
+ * Uses upsert to avoid race conditions with concurrent calls
  */
 export async function getOrCreateBaseline(
   userId: string,
   exerciseId: string
 ): Promise<ExerciseBaseline | null> {
-  // Try to get existing
-  const { data: existing } = await db
+  // Use upsert to handle race conditions - if record exists, do nothing (onConflict ignore)
+  const { data: upserted, error: upsertError } = await db
     .from('exercise_baselines')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('exercise_id', exerciseId)
-    .single();
-
-  if (existing) return existing;
-
-  // Create new baseline
-  const { data: created, error } = await db
-    .from('exercise_baselines')
-    .insert({
-      user_id: userId,
-      exercise_id: exerciseId,
-      rolling_avg_e1rm: 0,
-      session_history: [],
-      workout_count: 0,
-      is_baselined: false,
-      best_e1rm: 0,
-      best_e1rm_strength: 0,
-      best_e1rm_hypertrophy: 0,
-      best_e1rm_endurance: 0,
-    })
+    .upsert(
+      {
+        user_id: userId,
+        exercise_id: exerciseId,
+        rolling_avg_e1rm: 0,
+        session_history: [],
+        workout_count: 0,
+        is_baselined: false,
+        best_e1rm: 0,
+        best_e1rm_strength: 0,
+        best_e1rm_hypertrophy: 0,
+        best_e1rm_endurance: 0,
+      },
+      {
+        onConflict: 'user_id,exercise_id',
+        ignoreDuplicates: true,
+      }
+    )
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating baseline:', error);
-    return null;
+  // If upsert returned data, use it
+  if (upserted) return upserted;
+
+  // If upsert didn't return data (ignoreDuplicates), fetch the existing record
+  if (upsertError || !upserted) {
+    const { data: existing, error: fetchError } = await db
+      .from('exercise_baselines')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('exercise_id', exerciseId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching baseline:', fetchError);
+      return null;
+    }
+
+    return existing;
   }
 
-  return created;
+  return upserted;
 }
 
 /**
@@ -212,38 +224,51 @@ export async function updateGoalBucketPR(
 
 /**
  * Get or create muscle level for a user
+ * Uses upsert to avoid race conditions with concurrent calls
  */
 export async function getOrCreateMuscleLevel(
   userId: string,
   muscleGroup: string
 ): Promise<MuscleLevel | null> {
-  const { data: existing } = await db
+  // Use upsert to handle race conditions
+  const { data: upserted, error: upsertError } = await db
     .from('muscle_levels')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('muscle_group', muscleGroup)
-    .single();
-
-  if (existing) return existing;
-
-  const { data: created, error } = await db
-    .from('muscle_levels')
-    .insert({
-      user_id: userId,
-      muscle_group: muscleGroup,
-      current_level: 0,
-      current_xp: 0,
-      total_xp_earned: 0,
-    })
+    .upsert(
+      {
+        user_id: userId,
+        muscle_group: muscleGroup,
+        current_level: 0,
+        current_xp: 0,
+        total_xp_earned: 0,
+      },
+      {
+        onConflict: 'user_id,muscle_group',
+        ignoreDuplicates: true,
+      }
+    )
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating muscle level:', error);
-    return null;
+  if (upserted) return upserted;
+
+  // If upsert didn't return data, fetch the existing record
+  if (upsertError || !upserted) {
+    const { data: existing, error: fetchError } = await db
+      .from('muscle_levels')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('muscle_group', muscleGroup)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching muscle level:', fetchError);
+      return null;
+    }
+
+    return existing;
   }
 
-  return created;
+  return upserted;
 }
 
 /**
@@ -307,6 +332,7 @@ export async function addMuscleXp(
 
 /**
  * Get or create weekly stats for a muscle group
+ * Uses upsert to avoid race conditions with concurrent calls
  */
 export async function getOrCreateWeeklyStats(
   userId: string,
@@ -315,35 +341,47 @@ export async function getOrCreateWeeklyStats(
 ): Promise<WeeklyMuscleStats | null> {
   const week = formatDateAsISO(weekStart || getWeekStart());
 
-  const { data: existing } = await db
+  // Use upsert to handle race conditions
+  const { data: upserted, error: upsertError } = await db
     .from('weekly_muscle_stats')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('muscle_group', muscleGroup)
-    .eq('week_start', week)
-    .single();
-
-  if (existing) return existing;
-
-  const { data: created, error } = await db
-    .from('weekly_muscle_stats')
-    .insert({
-      user_id: userId,
-      muscle_group: muscleGroup,
-      week_start: week,
-      workout_count: 0,
-      total_sets: 0,
-      total_points: 0,
-    })
+    .upsert(
+      {
+        user_id: userId,
+        muscle_group: muscleGroup,
+        week_start: week,
+        workout_count: 0,
+        total_sets: 0,
+        total_points: 0,
+      },
+      {
+        onConflict: 'user_id,muscle_group,week_start',
+        ignoreDuplicates: true,
+      }
+    )
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating weekly stats:', error);
-    return null;
+  if (upserted) return upserted;
+
+  // If upsert didn't return data, fetch the existing record
+  if (upsertError || !upserted) {
+    const { data: existing, error: fetchError } = await db
+      .from('weekly_muscle_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('muscle_group', muscleGroup)
+      .eq('week_start', week)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching weekly stats:', fetchError);
+      return null;
+    }
+
+    return existing;
   }
 
-  return created;
+  return upserted;
 }
 
 /**

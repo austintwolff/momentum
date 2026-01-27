@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import Animated, {
@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { colors } from '@/constants/Colors';
 import { useSettingsStore } from '@/stores/settings.store';
 import { kgToLbs } from '@/stores/settings.store';
+import { ScoreBreakdown } from '@/components/workout/ScoreBreakdown';
 
 // Custom SVG Icons
 function CheckIcon({ size = 32 }: { size?: number }) {
@@ -66,6 +67,18 @@ function ExerciseIcon({ size = 20 }: { size?: number }) {
   );
 }
 
+function TrophyIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M8 21H16" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M12 17V21" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M7 4H17V9C17 12.3137 14.7614 15 12 15C9.23858 15 7 12.3137 7 9V4Z" stroke={colors.textSecondary} strokeWidth={2} />
+      <Path d="M17 8H19C20.1046 8 21 8.89543 21 10C21 11.1046 20.1046 12 19 12H17" stroke={colors.textSecondary} strokeWidth={2} />
+      <Path d="M7 8H5C3.89543 8 3 8.89543 3 10C3 11.1046 3.89543 12 5 12H7" stroke={colors.textSecondary} strokeWidth={2} />
+    </Svg>
+  );
+}
+
 interface ScoreComponents {
   progressScore: number;
   workScore: number;
@@ -81,10 +94,8 @@ function getScoreDescription(components: ScoreComponents): string {
   const { progressScore, workScore, consistencyScore, eprPrCount, weightPrCount } = components;
   const totalPRs = eprPrCount + weightPrCount;
 
-  // Build description from what actually happened
   const parts: string[] = [];
 
-  // Progress component (PRs and closeness)
   if (totalPRs >= 3) {
     parts.push(`${totalPRs} PRs`);
   } else if (totalPRs === 2) {
@@ -95,7 +106,6 @@ function getScoreDescription(components: ScoreComponents): string {
     parts.push('Near-PR effort');
   }
 
-  // Work component (volume)
   if (workScore >= 35) {
     parts.push('high volume');
   } else if (workScore >= 25) {
@@ -106,36 +116,35 @@ function getScoreDescription(components: ScoreComponents): string {
     parts.push('light volume');
   }
 
-  // Consistency component
   if (consistencyScore >= 5) {
     parts.push('great consistency');
   } else if (consistencyScore >= 4) {
     parts.push('staying consistent');
   }
 
-  // Combine parts with proper grammar
   if (parts.length === 0) {
     return 'Every rep counts';
   } else if (parts.length === 1) {
-    // Capitalize first letter
     return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   } else if (parts.length === 2) {
-    // Capitalize first part
     return parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + ' + ' + parts[1];
   } else {
-    // Three parts: "X, Y + Z"
     return parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + ', ' + parts[1] + ' + ' + parts[2];
   }
 }
 
-/**
- * Get the score color based on value
- */
 function getScoreColor(score: number): string {
   if (score >= 75) return colors.success;
   if (score >= 50) return colors.accent;
   if (score >= 25) return colors.warning;
   return colors.textSecondary;
+}
+
+function getWorkoutsThisWeek(consistencyScore: number): number {
+  if (consistencyScore >= 5) return 4;
+  if (consistencyScore >= 4) return 3;
+  if (consistencyScore >= 3) return 2;
+  return 1;
 }
 
 export default function WorkoutSummaryScreen() {
@@ -144,10 +153,15 @@ export default function WorkoutSummaryScreen() {
   const params = useLocalSearchParams<{
     workoutScore: string;
     progressScore: string;
+    maintenanceBonus: string;
     workScore: string;
     consistencyScore: string;
     eprPrCount: string;
     weightPrCount: string;
+    nearPRCount: string;
+    closenessRatio: string;
+    topPerformerName: string;
+    topPerformerPercent: string;
     totalVolume: string;
     totalSets: string;
     duration: string;
@@ -160,6 +174,10 @@ export default function WorkoutSummaryScreen() {
   const consistencyScore = parseInt(params.consistencyScore || '0', 10);
   const eprPrCount = parseInt(params.eprPrCount || '0', 10);
   const weightPrCount = parseInt(params.weightPrCount || '0', 10);
+  const nearPRCount = parseInt(params.nearPRCount || '0', 10);
+  const closenessRatio = parseFloat(params.closenessRatio || '0');
+  const topPerformerName = params.topPerformerName || '';
+  const topPerformerPercent = parseInt(params.topPerformerPercent || '0', 10);
   const totalVolumeKg = parseInt(params.totalVolume || '0', 10);
   const totalSets = parseInt(params.totalSets || '0', 10);
   const duration = parseInt(params.duration || '0', 10);
@@ -169,17 +187,26 @@ export default function WorkoutSummaryScreen() {
   const displayVolume = weightUnit === 'lbs'
     ? Math.round(kgToLbs(totalVolumeKg))
     : totalVolumeKg;
-  const volumeUnit = weightUnit === 'lbs' ? 'lbs' : 'kg';
+  const volumeUnitLabel = weightUnit === 'lbs' ? 'lbs' : 'kg';
+
+  // Calculate derived values for score breakdown
+  const totalPRs = eprPrCount + weightPrCount;
+  // If no topPerformer, there are no baselines so avgIntensity is meaningless
+  const hasBaselines = topPerformerName !== '';
+  const avgIntensity = hasBaselines ? Math.round(closenessRatio * 100) : null;
+  const workoutsThisWeek = getWorkoutsThisWeek(consistencyScore);
 
   // Animations
   const checkScale = useSharedValue(0);
   const scoreScale = useSharedValue(0);
+  const breakdownOpacity = useSharedValue(0);
   const statsOpacity = useSharedValue(0);
 
   useEffect(() => {
     checkScale.value = withSpring(1, { damping: 12 });
     scoreScale.value = withDelay(200, withSpring(1, { damping: 10 }));
-    statsOpacity.value = withDelay(400, withTiming(1, { duration: 300 }));
+    breakdownOpacity.value = withDelay(400, withTiming(1, { duration: 300 }));
+    statsOpacity.value = withDelay(600, withTiming(1, { duration: 300 }));
   }, []);
 
   const checkStyle = useAnimatedStyle(() => ({
@@ -189,6 +216,10 @@ export default function WorkoutSummaryScreen() {
   const scoreStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scoreScale.value }],
     opacity: scoreScale.value,
+  }));
+
+  const breakdownStyle = useAnimatedStyle(() => ({
+    opacity: breakdownOpacity.value,
   }));
 
   const statsStyle = useAnimatedStyle(() => ({
@@ -226,7 +257,11 @@ export default function WorkoutSummaryScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Success Check */}
         <Animated.View style={[styles.checkContainer, checkStyle]}>
           <View style={styles.checkCircle}>
@@ -244,33 +279,57 @@ export default function WorkoutSummaryScreen() {
           <Text style={styles.scoreDescription}>{scoreDescription}</Text>
         </Animated.View>
 
-        {/* Stats Grid */}
-        <Animated.View style={[styles.statsGrid, statsStyle]}>
-          <View style={styles.statCard}>
-            <WeightIcon />
-            <Text style={styles.statValue}>{formatVolume(displayVolume)}</Text>
-            <Text style={styles.statLabel}>{volumeUnit} volume</Text>
-          </View>
+        {/* Score Breakdown */}
+        <Animated.View style={[styles.breakdownSection, breakdownStyle]}>
+          <ScoreBreakdown
+            totalPRs={totalPRs}
+            nearPRLifts={nearPRCount}
+            avgIntensity={avgIntensity}
+            workingSets={totalSets}
+            exercisesHit={exerciseCount}
+            workoutsThisWeek={workoutsThisWeek}
+          />
+        </Animated.View>
 
-          <View style={styles.statCard}>
-            <SetsIcon />
-            <Text style={styles.statValue}>{totalSets}</Text>
-            <Text style={styles.statLabel}>sets</Text>
-          </View>
+        {/* Workout Stats */}
+        <Animated.View style={[styles.statsSection, statsStyle]}>
+          <Text style={styles.statsSectionTitle}>Workout Stats</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <WeightIcon />
+              <Text style={styles.statValue}>{formatVolume(displayVolume)}</Text>
+              <Text style={styles.statLabel}>Volume ({volumeUnitLabel})</Text>
+            </View>
 
-          <View style={styles.statCard}>
-            <ExerciseIcon />
-            <Text style={styles.statValue}>{exerciseCount}</Text>
-            <Text style={styles.statLabel}>exercises</Text>
-          </View>
+            <View style={styles.statCard}>
+              <ClockIcon />
+              <Text style={styles.statValue}>{formatDuration(duration)}</Text>
+              <Text style={styles.statLabel}>duration</Text>
+            </View>
 
-          <View style={styles.statCard}>
-            <ClockIcon />
-            <Text style={styles.statValue}>{formatDuration(duration)}</Text>
-            <Text style={styles.statLabel}>duration</Text>
+            {topPerformerName ? (
+              <View style={[styles.statCard, styles.topPerformerCard]}>
+                <TrophyIcon />
+                <Text style={styles.statValue} numberOfLines={1}>{topPerformerPercent}%</Text>
+                <Text style={styles.topPerformerName} numberOfLines={1}>{topPerformerName}</Text>
+                <Text style={styles.statLabel}>top performer</Text>
+              </View>
+            ) : (
+              <View style={styles.statCard}>
+                <SetsIcon />
+                <Text style={styles.statValue}>{totalSets}</Text>
+                <Text style={styles.statLabel}>sets</Text>
+              </View>
+            )}
+
+            <View style={styles.statCard}>
+              <ExerciseIcon />
+              <Text style={styles.statValue}>{exerciseCount}</Text>
+              <Text style={styles.statLabel}>exercises</Text>
+            </View>
           </View>
         </Animated.View>
-      </View>
+      </ScrollView>
 
       {/* Done Button */}
       <TouchableOpacity style={styles.doneButton} onPress={handleDone} accessibilityRole="button">
@@ -285,11 +344,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgPrimary,
   },
-  content: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingTop: 48,
+    paddingBottom: 24,
   },
   checkContainer: {
     marginBottom: 16,
@@ -308,10 +370,9 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     color: colors.textPrimary,
   },
-  // Score Section - Hero Element
   scoreSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 24,
     paddingVertical: 24,
     paddingHorizontal: 48,
     backgroundColor: colors.bgSecondary,
@@ -339,7 +400,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  // Stats Grid
+  breakdownSection: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  statsSection: {
+    width: '100%',
+  },
+  statsSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -354,11 +427,20 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: colors.bgSecondary,
   },
+  topPerformerCard: {
+    gap: 4,
+  },
   statValue: {
     fontSize: 24,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
+  },
+  topPerformerName: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
   statLabel: {
     fontSize: 12,

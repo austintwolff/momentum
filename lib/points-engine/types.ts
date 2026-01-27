@@ -117,15 +117,15 @@ export const POINTS_CONFIG = {
 
   REP_MULTIPLIERS: {
     STRENGTH: { min: 1, max: 4, multiplier: 1.0 },
-    HYPERTROPHY: { min: 5, max: 8, multiplier: 1.25 },
+    HYPERTROPHY: { min: 5, max: 8, multiplier: 1.1 },
     HYPERTROPHY_ENDURANCE: { min: 9, max: 12, multiplier: 1.0 },
     ENDURANCE: { min: 13, max: 20, multiplier: 0.9 },
     HIGH_REP: { min: 21, max: Infinity, multiplier: 0.75 },
   },
 
   OVERLOAD_TIERS: {
-    SMALL: { minPercent: 1, maxPercent: 5, bonus: 0.25 },
-    MODERATE: { minPercent: 5, maxPercent: 15, bonus: 0.5 },
+    SMALL: { minPercent: 1, maxPercent: 5, bonus: 0.4 },
+    MODERATE: { minPercent: 5, maxPercent: 15, bonus: 0.75 },
     MAJOR: { minPercent: 15, maxPercent: Infinity, bonus: 1.0 },
   },
 

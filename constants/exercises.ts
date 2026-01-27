@@ -24,7 +24,9 @@ export const MUSCLE_GROUPS = [
 export type MuscleGroup = (typeof MUSCLE_GROUPS)[number];
 
 export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
-  // Chest
+  // ============================================================================
+  // CHEST
+  // ============================================================================
   {
     name: 'Bench Press',
     description: 'Barbell bench press for chest development',
@@ -34,7 +36,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Bench Press',
+    name: 'Dumbbell Bench Press',
     description: 'Dumbbell bench press for chest with greater range of motion',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
@@ -58,7 +60,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Incline Bench Press',
+    name: 'Incline Dumbbell Press',
     description: 'Incline dumbbell press for upper chest',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
@@ -66,7 +68,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Chest Press',
+    name: 'Chest Press Machine',
     description: 'Machine press for chest development',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
@@ -74,7 +76,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Incline Chest Press',
+    name: 'Incline Chest Press Machine',
     description: 'Machine incline press for upper chest',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
@@ -82,7 +84,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Chest Fly',
+    name: 'Chest Fly Machine',
     description: 'Machine fly for chest isolation',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
@@ -90,16 +92,32 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Downward Fly',
-    description: 'Downward cable fly for chest',
+    name: 'Dumbbell Flyes',
+    description: 'Dumbbell fly isolation for chest',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
-    equipment: ['machine'],
+    equipment: ['dumbbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Cable Crossover',
+    description: 'Cable isolation for chest',
+    exerciseType: 'weighted',
+    muscleGroup: 'Chest',
+    equipment: ['cable'],
+    isCompound: false,
+  },
+  {
+    name: 'Cable Fly',
+    description: 'Cable fly for chest',
+    exerciseType: 'weighted',
+    muscleGroup: 'Chest',
+    equipment: ['cable'],
     isCompound: false,
   },
   {
     name: 'Chest Dip',
-    description: 'Assisted dip machine for chest',
+    description: 'Dip movement for chest',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
     equipment: ['machine'],
@@ -114,7 +132,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Landmine Chest Press',
+    name: 'Landmine Press',
     description: 'Landmine press for chest',
     exerciseType: 'weighted',
     muscleGroup: 'Chest',
@@ -122,34 +140,36 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Push-Up',
+    name: 'Push-ups',
     description: 'Classic bodyweight chest exercise',
     exerciseType: 'bodyweight',
     muscleGroup: 'Chest',
     equipment: [],
     isCompound: true,
   },
-  {
-    name: 'Upward Rip',
-    description: 'Upward cable movement for chest',
-    exerciseType: 'weighted',
-    muscleGroup: 'Chest',
-    equipment: ['cable'],
-    isCompound: false,
-  },
 
-  // Back
+  // ============================================================================
+  // BACK
+  // ============================================================================
   {
-    name: 'Bent-Over Row',
-    description: 'Bent over dumbbell row for back thickness',
+    name: 'Deadlift',
+    description: 'Full body compound lift focusing on posterior chain',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
-    equipment: ['dumbbell'],
+    equipment: ['barbell'],
     isCompound: true,
   },
   {
-    name: 'Bent-Over One-Arm Row',
-    description: 'Single arm bent over row for unilateral back development',
+    name: 'Barbell Row',
+    description: 'Bent over barbell row for back thickness',
+    exerciseType: 'weighted',
+    muscleGroup: 'Back',
+    equipment: ['barbell'],
+    isCompound: true,
+  },
+  {
+    name: 'Dumbbell Row',
+    description: 'Single arm dumbbell row for back',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
     equipment: ['dumbbell'],
@@ -164,6 +184,14 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
+    name: 'T-Bar Row',
+    description: 'T-bar row for back thickness',
+    exerciseType: 'weighted',
+    muscleGroup: 'Back',
+    equipment: ['machine'],
+    isCompound: true,
+  },
+  {
     name: 'Lat Pulldown',
     description: 'Cable lat pulldown for back width',
     exerciseType: 'weighted',
@@ -172,7 +200,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Lat Pulldown',
+    name: 'Lat Pulldown Machine',
     description: 'Machine lat pulldown for back width',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
@@ -180,47 +208,31 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Lat Pulldown (Single Arm)',
-    description: 'Single arm machine lat pulldown',
+    name: 'Single Arm Lat Pulldown',
+    description: 'Single arm lat pulldown',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
-    equipment: ['machine'],
+    equipment: ['cable'],
     isCompound: true,
   },
   {
-    name: 'Lat Pushdown',
-    description: 'Straight arm lat pushdown for lats',
+    name: 'Straight Arm Pulldown',
+    description: 'Straight arm lat pulldown for lats',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
     equipment: ['cable'],
     isCompound: false,
   },
   {
-    name: 'One-Arm Row',
-    description: 'Single arm cable row for back',
+    name: 'Seated Cable Row',
+    description: 'Cable row for back thickness',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
     equipment: ['cable'],
     isCompound: true,
   },
   {
-    name: 'Pull-Up',
-    description: 'Bodyweight vertical pull for back width',
-    exerciseType: 'bodyweight',
-    muscleGroup: 'Back',
-    equipment: [],
-    isCompound: true,
-  },
-  {
-    name: 'Pulldown',
-    description: 'Machine pulldown for back',
-    exerciseType: 'weighted',
-    muscleGroup: 'Back',
-    equipment: ['machine'],
-    isCompound: true,
-  },
-  {
-    name: 'Seated Row',
+    name: 'Seated Row Machine',
     description: 'Machine seated row for back thickness',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
@@ -228,23 +240,23 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Seated Row',
-    description: 'Cable seated row for back thickness',
-    exerciseType: 'weighted',
+    name: 'Pull-ups',
+    description: 'Bodyweight vertical pull for back width',
+    exerciseType: 'bodyweight',
     muscleGroup: 'Back',
-    equipment: ['cable'],
+    equipment: [],
     isCompound: true,
   },
   {
-    name: 'T-Bar Row',
-    description: 'T-bar row machine for back thickness',
-    exerciseType: 'weighted',
+    name: 'Chin-ups',
+    description: 'Underhand grip pull-up emphasizing biceps',
+    exerciseType: 'bodyweight',
     muscleGroup: 'Back',
-    equipment: ['machine'],
+    equipment: [],
     isCompound: true,
   },
   {
-    name: 'Face Pull',
+    name: 'Face Pulls',
     description: 'Cable face pull for rear delts and upper back',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
@@ -252,7 +264,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Shoulder Shrug',
+    name: 'Barbell Shrug',
     description: 'Barbell shrug for traps',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
@@ -260,39 +272,17 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Shrug',
-    description: 'Cable shrug for traps',
+    name: 'Dumbbell Shrug',
+    description: 'Dumbbell shrug for traps',
     exerciseType: 'weighted',
     muscleGroup: 'Back',
-    equipment: ['cable'],
+    equipment: ['dumbbell'],
     isCompound: false,
   },
 
-  // Shoulders
-  {
-    name: 'Arnold Press',
-    description: 'Rotating dumbbell press for full delt activation',
-    exerciseType: 'weighted',
-    muscleGroup: 'Shoulders',
-    equipment: ['dumbbell'],
-    isCompound: true,
-  },
-  {
-    name: 'Front Raise',
-    description: 'Dumbbell front raise for front deltoids',
-    exerciseType: 'weighted',
-    muscleGroup: 'Shoulders',
-    equipment: ['dumbbell'],
-    isCompound: false,
-  },
-  {
-    name: 'Lateral Raise',
-    description: 'Dumbbell lateral raise for side deltoids',
-    exerciseType: 'weighted',
-    muscleGroup: 'Shoulders',
-    equipment: ['dumbbell'],
-    isCompound: false,
-  },
+  // ============================================================================
+  // SHOULDERS
+  // ============================================================================
   {
     name: 'Overhead Press',
     description: 'Standing barbell press for shoulders',
@@ -302,15 +292,15 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Overhead Press',
-    description: 'Standing or seated dumbbell press',
+    name: 'Dumbbell Shoulder Press',
+    description: 'Seated or standing dumbbell press',
     exerciseType: 'weighted',
     muscleGroup: 'Shoulders',
     equipment: ['dumbbell'],
     isCompound: true,
   },
   {
-    name: 'Shoulder Press',
+    name: 'Shoulder Press Machine',
     description: 'Machine press for shoulders',
     exerciseType: 'weighted',
     muscleGroup: 'Shoulders',
@@ -318,12 +308,44 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Shoulder Press (Single Arm)',
-    description: 'Single arm machine shoulder press',
+    name: 'Arnold Press',
+    description: 'Rotating dumbbell press for full delt activation',
     exerciseType: 'weighted',
     muscleGroup: 'Shoulders',
-    equipment: ['machine'],
+    equipment: ['dumbbell'],
     isCompound: true,
+  },
+  {
+    name: 'Lateral Raises',
+    description: 'Dumbbell lateral raise for side deltoids',
+    exerciseType: 'weighted',
+    muscleGroup: 'Shoulders',
+    equipment: ['dumbbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Cable Lateral Raise',
+    description: 'Cable lateral raise for side deltoids',
+    exerciseType: 'weighted',
+    muscleGroup: 'Shoulders',
+    equipment: ['cable'],
+    isCompound: false,
+  },
+  {
+    name: 'Front Raises',
+    description: 'Dumbbell front raise for front deltoids',
+    exerciseType: 'weighted',
+    muscleGroup: 'Shoulders',
+    equipment: ['dumbbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Rear Delt Flyes',
+    description: 'Isolation for rear deltoids',
+    exerciseType: 'weighted',
+    muscleGroup: 'Shoulders',
+    equipment: ['dumbbell'],
+    isCompound: false,
   },
   {
     name: 'Upright Row',
@@ -334,9 +356,11 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
 
-  // Biceps
+  // ============================================================================
+  // BICEPS
+  // ============================================================================
   {
-    name: 'Bicep Curl',
+    name: 'Barbell Curl',
     description: 'Classic barbell bicep curl',
     exerciseType: 'weighted',
     muscleGroup: 'Biceps',
@@ -344,15 +368,7 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Bicep Curl',
-    description: 'Cable bicep curl',
-    exerciseType: 'weighted',
-    muscleGroup: 'Biceps',
-    equipment: ['cable'],
-    isCompound: false,
-  },
-  {
-    name: 'Bicep Curl',
+    name: 'Dumbbell Curl',
     description: 'Dumbbell bicep curl',
     exerciseType: 'weighted',
     muscleGroup: 'Biceps',
@@ -360,19 +376,19 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Bicep Curl',
+    name: 'Cable Curl',
+    description: 'Cable bicep curl',
+    exerciseType: 'weighted',
+    muscleGroup: 'Biceps',
+    equipment: ['cable'],
+    isCompound: false,
+  },
+  {
+    name: 'Machine Curl',
     description: 'Machine bicep curl',
     exerciseType: 'weighted',
     muscleGroup: 'Biceps',
     equipment: ['machine'],
-    isCompound: false,
-  },
-  {
-    name: 'Concentration Curl',
-    description: 'Seated single arm concentration curl',
-    exerciseType: 'weighted',
-    muscleGroup: 'Biceps',
-    equipment: ['dumbbell'],
     isCompound: false,
   },
   {
@@ -384,7 +400,15 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Incline Curl',
+    name: 'Concentration Curl',
+    description: 'Seated single arm concentration curl',
+    exerciseType: 'weighted',
+    muscleGroup: 'Biceps',
+    equipment: ['dumbbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Incline Dumbbell Curl',
     description: 'Incline bench dumbbell curl for long head stretch',
     exerciseType: 'weighted',
     muscleGroup: 'Biceps',
@@ -393,14 +417,14 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
   },
   {
     name: 'Preacher Curl',
-    description: 'Barbell preacher curl for bicep isolation',
+    description: 'Preacher curl for bicep isolation',
     exerciseType: 'weighted',
     muscleGroup: 'Biceps',
     equipment: ['barbell'],
     isCompound: false,
   },
   {
-    name: 'Preacher Curl',
+    name: 'Preacher Curl Machine',
     description: 'Machine preacher curl for bicep isolation',
     exerciseType: 'weighted',
     muscleGroup: 'Biceps',
@@ -408,7 +432,9 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
 
-  // Triceps
+  // ============================================================================
+  // TRICEPS
+  // ============================================================================
   {
     name: 'Close Grip Bench Press',
     description: 'Close grip bench press for triceps',
@@ -418,38 +444,6 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: true,
   },
   {
-    name: 'Overhead Tricep Extension',
-    description: 'Overhead cable extension for triceps long head',
-    exerciseType: 'weighted',
-    muscleGroup: 'Triceps',
-    equipment: ['cable'],
-    isCompound: false,
-  },
-  {
-    name: 'Skull Crusher',
-    description: 'Lying barbell tricep extension',
-    exerciseType: 'weighted',
-    muscleGroup: 'Triceps',
-    equipment: ['barbell'],
-    isCompound: false,
-  },
-  {
-    name: 'Skull Crusher',
-    description: 'Lying dumbbell tricep extension',
-    exerciseType: 'weighted',
-    muscleGroup: 'Triceps',
-    equipment: ['dumbbell'],
-    isCompound: false,
-  },
-  {
-    name: 'Triceps Extension',
-    description: 'Machine tricep extension',
-    exerciseType: 'weighted',
-    muscleGroup: 'Triceps',
-    equipment: ['machine'],
-    isCompound: false,
-  },
-  {
     name: 'Triceps Pushdown',
     description: 'Cable tricep pushdown',
     exerciseType: 'weighted',
@@ -457,14 +451,80 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     equipment: ['cable'],
     isCompound: false,
   },
+  {
+    name: 'Overhead Tricep Extension',
+    description: 'Overhead cable or dumbbell extension for triceps',
+    exerciseType: 'weighted',
+    muscleGroup: 'Triceps',
+    equipment: ['cable'],
+    isCompound: false,
+  },
+  {
+    name: 'Dumbbell Tricep Extension',
+    description: 'Dumbbell tricep extension',
+    exerciseType: 'weighted',
+    muscleGroup: 'Triceps',
+    equipment: ['dumbbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Tricep Extension Machine',
+    description: 'Machine tricep extension',
+    exerciseType: 'weighted',
+    muscleGroup: 'Triceps',
+    equipment: ['machine'],
+    isCompound: false,
+  },
+  {
+    name: 'Skull Crushers',
+    description: 'Lying barbell tricep extension',
+    exerciseType: 'weighted',
+    muscleGroup: 'Triceps',
+    equipment: ['barbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Tricep Dips',
+    description: 'Bodyweight tricep exercise',
+    exerciseType: 'bodyweight',
+    muscleGroup: 'Triceps',
+    equipment: [],
+    isCompound: true,
+  },
 
-  // Quadriceps
+  // ============================================================================
+  // QUADRICEPS
+  // ============================================================================
+  {
+    name: 'Squat',
+    description: 'Barbell back squat for legs',
+    exerciseType: 'weighted',
+    muscleGroup: 'Quadriceps',
+    equipment: ['barbell'],
+    isCompound: true,
+  },
   {
     name: 'Front Squat',
     description: 'Front loaded barbell squat for quad emphasis',
     exerciseType: 'weighted',
     muscleGroup: 'Quadriceps',
     equipment: ['barbell'],
+    isCompound: true,
+  },
+  {
+    name: 'Hack Squat',
+    description: 'Machine hack squat for quads',
+    exerciseType: 'weighted',
+    muscleGroup: 'Quadriceps',
+    equipment: ['machine'],
+    isCompound: true,
+  },
+  {
+    name: 'Leg Press',
+    description: 'Machine leg press for legs',
+    exerciseType: 'weighted',
+    muscleGroup: 'Quadriceps',
+    equipment: ['machine'],
     isCompound: true,
   },
   {
@@ -476,31 +536,41 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     isCompound: false,
   },
   {
-    name: 'Leg Press',
-    description: 'Machine leg press for legs',
+    name: 'Lunges',
+    description: 'Dumbbell lunges for legs',
     exerciseType: 'weighted',
     muscleGroup: 'Quadriceps',
-    equipment: ['machine'],
+    equipment: ['dumbbell'],
     isCompound: true,
   },
   {
-    name: 'Squat',
-    description: 'Barbell back squat for legs',
+    name: 'Bulgarian Split Squat',
+    description: 'Single leg squat with rear foot elevated',
     exerciseType: 'weighted',
     muscleGroup: 'Quadriceps',
+    equipment: ['dumbbell'],
+    isCompound: true,
+  },
+
+  // ============================================================================
+  // HAMSTRINGS
+  // ============================================================================
+  {
+    name: 'Romanian Deadlift',
+    description: 'Hip hinge for hamstrings and glutes',
+    exerciseType: 'weighted',
+    muscleGroup: 'Hamstrings',
     equipment: ['barbell'],
     isCompound: true,
   },
   {
-    name: 'Squat',
-    description: 'Machine squat for legs',
+    name: 'Dumbbell Romanian Deadlift',
+    description: 'Dumbbell Romanian deadlift',
     exerciseType: 'weighted',
-    muscleGroup: 'Quadriceps',
-    equipment: ['machine'],
+    muscleGroup: 'Hamstrings',
+    equipment: ['dumbbell'],
     isCompound: true,
   },
-
-  // Hamstrings
   {
     name: 'Leg Curl',
     description: 'Machine leg curl for hamstrings',
@@ -509,24 +579,140 @@ export const DEFAULT_EXERCISES: ExerciseDefinition[] = [
     equipment: ['machine'],
     isCompound: false,
   },
-
-  // Core
   {
-    name: 'Crunch',
+    name: 'Seated Leg Curl',
+    description: 'Seated machine leg curl',
+    exerciseType: 'weighted',
+    muscleGroup: 'Hamstrings',
+    equipment: ['machine'],
+    isCompound: false,
+  },
+  {
+    name: 'Good Mornings',
+    description: 'Barbell hip hinge for posterior chain',
+    exerciseType: 'weighted',
+    muscleGroup: 'Hamstrings',
+    equipment: ['barbell'],
+    isCompound: true,
+  },
+
+  // ============================================================================
+  // GLUTES
+  // ============================================================================
+  {
+    name: 'Hip Thrust',
+    description: 'Primary glute builder',
+    exerciseType: 'weighted',
+    muscleGroup: 'Glutes',
+    equipment: ['barbell'],
+    isCompound: true,
+  },
+  {
+    name: 'Glute Bridge',
+    description: 'Bodyweight or weighted glute exercise',
+    exerciseType: 'bodyweight',
+    muscleGroup: 'Glutes',
+    equipment: [],
+    isCompound: false,
+  },
+  {
+    name: 'Cable Kickback',
+    description: 'Cable isolation for glutes',
+    exerciseType: 'weighted',
+    muscleGroup: 'Glutes',
+    equipment: ['cable'],
+    isCompound: false,
+  },
+
+  // ============================================================================
+  // CALVES
+  // ============================================================================
+  {
+    name: 'Standing Calf Raise',
+    description: 'Standing calf raise on machine',
+    exerciseType: 'weighted',
+    muscleGroup: 'Calves',
+    equipment: ['machine'],
+    isCompound: false,
+  },
+  {
+    name: 'Seated Calf Raise',
+    description: 'Seated calf raise for soleus',
+    exerciseType: 'weighted',
+    muscleGroup: 'Calves',
+    equipment: ['machine'],
+    isCompound: false,
+  },
+
+  // ============================================================================
+  // CORE
+  // ============================================================================
+  {
+    name: 'Plank',
+    description: 'Isometric core stability exercise',
+    exerciseType: 'bodyweight',
+    muscleGroup: 'Core',
+    equipment: [],
+    isCompound: false,
+  },
+  {
+    name: 'Cable Crunch',
+    description: 'Weighted ab exercise',
+    exerciseType: 'weighted',
+    muscleGroup: 'Core',
+    equipment: ['cable'],
+    isCompound: false,
+  },
+  {
+    name: 'Crunch Machine',
     description: 'Machine crunch for abs',
     exerciseType: 'weighted',
     muscleGroup: 'Core',
     equipment: ['machine'],
     isCompound: false,
   },
+  {
+    name: 'Hanging Leg Raise',
+    description: 'Advanced ab exercise',
+    exerciseType: 'bodyweight',
+    muscleGroup: 'Core',
+    equipment: [],
+    isCompound: false,
+  },
+  {
+    name: 'Ab Wheel Rollout',
+    description: 'Dynamic core stability exercise',
+    exerciseType: 'bodyweight',
+    muscleGroup: 'Core',
+    equipment: [],
+    isCompound: false,
+  },
+  {
+    name: 'Russian Twist',
+    description: 'Rotational core exercise',
+    exerciseType: 'bodyweight',
+    muscleGroup: 'Core',
+    equipment: [],
+    isCompound: false,
+  },
 
-  // Forearms
+  // ============================================================================
+  // FOREARMS
+  // ============================================================================
   {
     name: 'Reverse Curl',
     description: 'Overhand grip barbell curl for forearms',
     exerciseType: 'weighted',
     muscleGroup: 'Forearms',
     equipment: ['barbell'],
+    isCompound: false,
+  },
+  {
+    name: 'Wrist Curl',
+    description: 'Wrist curl for forearm flexors',
+    exerciseType: 'weighted',
+    muscleGroup: 'Forearms',
+    equipment: ['dumbbell'],
     isCompound: false,
   },
 ];

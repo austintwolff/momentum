@@ -16,7 +16,7 @@ import { colors } from '@/constants/Colors';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore } from '@/stores/settings.store';
-import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet } from '@/services/workout.service';
+import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet, getUserTopAndRecentExercises } from '@/services/workout.service';
 import { syncAndFetchExercises, clearExerciseCache } from '@/services/exercise-sync.service';
 import ExercisePicker from '@/components/workout/ExercisePicker';
 import ExerciseLogPopup, { DetailedSet } from '@/components/workout/ExerciseLogPopup';
@@ -168,7 +168,7 @@ export default function ExerciseDeckScreen() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<'deck' | 'list'>('deck');
+  const [viewMode, setViewMode] = useState<'deck' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
@@ -184,6 +184,9 @@ export default function ExerciseDeckScreen() {
 
   // Recent sets data for each exercise (keyed by exercise.id)
   const [recentSetsMap, setRecentSetsMap] = useState<Map<string, RecentTopSet[]>>(new Map());
+
+  // User's prioritized exercises (top by usage + recent)
+  const [prioritizedExerciseIds, setPrioritizedExerciseIds] = useState<Set<string>>(new Set());
 
   const flatListRef = useRef<FlatList>(null);
   const listViewRef = useRef<FlatList>(null);
@@ -338,6 +341,17 @@ export default function ExerciseDeckScreen() {
 
       console.log(`[Deck] Loaded ${allExercises.length} exercises`);
       setExercises(allExercises);
+
+      // Step 2.5: Fetch user's top and recent exercises for prioritization
+      const { topExerciseIds, recentExerciseIds } = await getUserTopAndRecentExercises(
+        profile.id,
+        workoutMuscleGroups,
+        10,
+        5
+      );
+      const prioritizedIds = new Set([...topExerciseIds, ...recentExerciseIds]);
+      setPrioritizedExerciseIds(prioritizedIds);
+      console.log(`[Deck] Prioritized ${prioritizedIds.size} exercises (${topExerciseIds.length} top + ${recentExerciseIds.length} recent)`);
 
       // Step 3: Populate deck with preferred + recommended exercises
       const preferredExerciseNames = workoutType ? getExercisesForWorkout(workoutType) : [];
@@ -554,8 +568,9 @@ export default function ExerciseDeckScreen() {
   // Card data from active workout
   const deckExercises = activeWorkout?.exercises || [];
 
-  // Filter exercises by search query (for list view - shows full pool)
-  const filteredListExercises = useMemo(() => {
+  // Filter and organize exercises for list view
+  // Returns { prioritized: Exercise[], rest: Exercise[] }
+  const organizedListExercises = useMemo(() => {
     // Filter all exercises by workout type first
     let filtered: Exercise[];
     if (workoutMuscleGroups.length === 0) {
@@ -568,26 +583,62 @@ export default function ExerciseDeckScreen() {
       );
     }
 
-    // Then filter by search query
-    if (!searchQuery.trim()) return filtered;
-    const query = searchQuery.toLowerCase();
-    return filtered.filter(exercise =>
-      exercise.name.toLowerCase().includes(query) ||
-      exercise.muscle_group.toLowerCase().includes(query)
-    );
-  }, [exercises, workoutMuscleGroups, searchQuery]);
+    // Apply search query if present
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(exercise =>
+        exercise.name.toLowerCase().includes(query) ||
+        exercise.muscle_group.toLowerCase().includes(query)
+      );
+    }
+
+    // Split into prioritized and rest
+    const prioritized: Exercise[] = [];
+    const rest: Exercise[] = [];
+
+    for (const exercise of filtered) {
+      if (prioritizedExerciseIds.has(exercise.id)) {
+        prioritized.push(exercise);
+      } else {
+        rest.push(exercise);
+      }
+    }
+
+    // Alphabetize both lists
+    const sortByName = (a: Exercise, b: Exercise) => a.name.localeCompare(b.name);
+    prioritized.sort(sortByName);
+    rest.sort(sortByName);
+
+    return { prioritized, rest };
+  }, [exercises, workoutMuscleGroups, searchQuery, prioritizedExerciseIds]);
+
+  // Combined list with divider marker for FlatList
+  type ListItem = Exercise | { type: 'divider' };
+  const listDataWithDivider = useMemo((): ListItem[] => {
+    const { prioritized, rest } = organizedListExercises;
+    const items: ListItem[] = [...prioritized];
+
+    // Only add divider if we have both sections
+    if (prioritized.length > 0 && rest.length > 0) {
+      items.push({ type: 'divider' });
+    }
+
+    items.push(...rest);
+    return items;
+  }, [organizedListExercises]);
 
   // Get deck exercise index by exercise ID (returns -1 if not in deck)
   const getDeckIndex = useCallback((exerciseId: string): number => {
     return deckExercises.findIndex(item => item.exercise.id === exerciseId);
   }, [deckExercises]);
 
-  // Get deck exercise data (sets) if in deck
+  // Get deck exercise data (sets, completion status) if in deck
   const getDeckExerciseData = useCallback((exerciseId: string) => {
     const deckItem = deckExercises.find(item => item.exercise.id === exerciseId);
     if (!deckItem) return null;
     return {
       setsCompleted: deckItem.sets.length,
+      isCompleted: deckItem.isCompleted,
     };
   }, [deckExercises]);
 
@@ -784,80 +835,106 @@ export default function ExerciseDeckScreen() {
     }, 50);
   }, [logPopupExercise, profile, getDeckIndex, addExercise, deckExercises.length, saveSetsForExercise, logSimpleSets, markExerciseCompleted, activeWorkout]);
 
-  // Render list view row (shows full pool of exercises)
-  const renderListRow = useCallback(({ item }: { item: Exercise }) => {
-    const exercise = item;
+  // Render list view row (shows full pool of exercises) or divider
+  const renderListItem = useCallback(({ item }: { item: ListItem }) => {
+    // Check if it's a divider
+    if ('type' in item && item.type === 'divider') {
+      return (
+        <View style={styles.listDividerContainer}>
+          <View style={styles.listDivider}>
+            <View style={styles.listDividerLine} />
+          </View>
+          <Text style={styles.sectionHeader}>Other Exercises</Text>
+        </View>
+      );
+    }
+
+    const exercise = item as Exercise;
     const equipmentType = getEquipmentType(exercise.equipment, exercise.exercise_type);
     const deckData = getDeckExerciseData(exercise.id);
+    const isCompleted = deckData?.isCompleted ?? false;
 
     return (
-      <View style={styles.listRow}>
+      <View style={[
+        styles.listRow,
+        isCompleted && styles.listRowCompleted,
+      ]}>
         <TouchableOpacity
           style={styles.listRowContent}
-          onPress={() => {
-            const deckIndex = getDeckIndex(exercise.id);
-            if (deckIndex >= 0) {
-              setCurrentIndex(deckIndex);
-              setViewMode('deck');
-              setTimeout(() => {
-                flatListRef.current?.scrollToIndex({ index: deckIndex, animated: false });
-              }, 50);
-            }
-          }}
+          onPress={() => handleStartFromList(exercise)}
           activeOpacity={0.7}
         >
           <View style={styles.listRowLeft}>
             <View style={styles.listRowNameRow}>
-              <Text style={styles.listRowName} numberOfLines={1}>
+              <Text style={[
+                styles.listRowName,
+                isCompleted && styles.listRowNameCompleted,
+              ]} numberOfLines={1}>
                 {exercise.name}
               </Text>
             </View>
             <View style={styles.listRowMeta}>
-              <Text style={styles.listRowMuscle}>
+              <Text style={[
+                styles.listRowMuscle,
+                isCompleted && styles.listRowMetaCompleted,
+              ]}>
                 {exercise.muscle_group}
               </Text>
-              <Text style={styles.listRowDot}>•</Text>
-              <Text style={styles.listRowEquipment}>
+              <Text style={[
+                styles.listRowDot,
+                isCompleted && styles.listRowMetaCompleted,
+              ]}>•</Text>
+              <Text style={[
+                styles.listRowEquipment,
+                isCompleted && styles.listRowMetaCompleted,
+              ]}>
                 {equipmentType}
               </Text>
             </View>
           </View>
           <View style={styles.listRowRight}>
-            {deckData && deckData.setsCompleted > 0 && (
-              <View style={styles.listRowStats}>
-                <Text style={styles.listRowSets}>
-                  {deckData.setsCompleted} {deckData.setsCompleted === 1 ? 'set' : 'sets'}
-                </Text>
-              </View>
-            )}
+            {/* Hide set count for completed exercises */}
           </View>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.listRowStartButton}
-          onPress={() => handleStartFromList(exercise)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.listRowStartText}>Start</Text>
-        </TouchableOpacity>
+        {isCompleted ? (
+          <View style={styles.listRowCompletedButton}>
+            <Text style={styles.listRowCompletedText}>Completed</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.listRowStartButton}
+            onPress={() => handleStartFromList(exercise)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.listRowStartText}>Start</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
-  }, [getDeckExerciseData, getDeckIndex, handleStartFromList]);
+  }, [getDeckExerciseData, handleStartFromList]);
 
-  // Render Add Exercise row at top of list
+  // Render Add Exercise row and Favorites header at top of list
   const renderListHeader = useCallback(() => (
-    <TouchableOpacity
-      style={styles.addExerciseRow}
-      onPress={() => setShowExercisePicker(true)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.addExerciseIcon}>
-        <PlusIcon size={20} color={colors.textPrimary} />
+    <View>
+      <View style={styles.listRow}>
+        <TouchableOpacity
+          style={styles.addExerciseContent}
+          onPress={() => setShowExercisePicker(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.addExerciseIcon}>
+            <PlusIcon size={20} color={colors.textPrimary} />
+          </View>
+          <Text style={styles.addExerciseText}>
+            Add Exercise
+          </Text>
+        </TouchableOpacity>
       </View>
-      <Text style={styles.addExerciseText}>
-        Add Exercise
-      </Text>
-    </TouchableOpacity>
-  ), []);
+      {organizedListExercises.prioritized.length > 0 && (
+        <Text style={styles.sectionHeader}>Top Exercises</Text>
+      )}
+    </View>
+  ), [organizedListExercises.prioritized.length]);
 
   // Empty state when no exercises in deck
   const renderEmptyState = () => (
@@ -913,14 +990,8 @@ export default function ExerciseDeckScreen() {
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.iconButton}
-          onPress={handleToggleView}
-          activeOpacity={0.7}
-          accessibilityLabel={viewMode === 'deck' ? 'Switch to list view' : 'Switch to deck view'}
-        >
-          {viewMode === 'deck' ? <ListIcon size={24} /> : <GridIcon size={24} />}
-        </TouchableOpacity>
+        {/* Toggle button hidden - keeping list view only */}
+        <View style={styles.iconButton} />
       </View>
 
       {/* Timer */}
@@ -992,12 +1063,13 @@ export default function ExerciseDeckScreen() {
           {/* Exercise List */}
           <FlatList
             ref={listViewRef}
-            data={filteredListExercises}
-            renderItem={renderListRow}
-            keyExtractor={(item) => item.id}
+            data={listDataWithDivider}
+            renderItem={renderListItem}
+            keyExtractor={(item, index) => 'type' in item ? `divider-${index}` : item.id}
             ListHeaderComponent={renderListHeader}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             ListEmptyComponent={
               <View style={styles.listEmpty}>
                 <Text style={styles.listEmptyText}>
@@ -1005,11 +1077,6 @@ export default function ExerciseDeckScreen() {
                 </Text>
               </View>
             }
-            getItemLayout={(_, index) => ({
-              length: 72,
-              offset: 72 * (index + 1), // +1 for header
-              index,
-            })}
           />
         </View>
       )}
@@ -1395,14 +1462,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  addExerciseRow: {
+  addExerciseContent: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
     gap: 12,
-    backgroundColor: colors.bgSecondary,
   },
   addExerciseIcon: {
     width: 36,
@@ -1417,6 +1481,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    marginTop: 16,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1424,6 +1497,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
     backgroundColor: colors.bgSecondary,
+  },
+  listRowCompleted: {
+    backgroundColor: colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  listRowNameCompleted: {
+    color: colors.textSecondary,
+  },
+  listRowMetaCompleted: {
+    color: colors.textMuted,
   },
   listRowContent: {
     flex: 1,
@@ -1487,6 +1571,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  listRowCompletedButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  listRowCompletedText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
   listEmpty: {
     padding: 40,
     alignItems: 'center',
@@ -1495,5 +1592,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
     color: colors.textSecondary,
+  },
+  listDividerContainer: {
+    marginTop: 8,
+  },
+  listDivider: {
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  listDividerLine: {
+    height: 2,
+    backgroundColor: colors.accent,
+    borderRadius: 1,
   },
 });

@@ -11,9 +11,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { DEFAULT_EXERCISES, MUSCLE_GROUPS, ExerciseDefinition } from '@/constants/exercises';
+import { MUSCLE_GROUPS } from '@/constants/exercises';
 import { Exercise } from '@/types/database';
-import { fetchExercisesFromDatabase } from '@/services/workout.service';
+import { syncAndFetchExercises } from '@/services/exercise-sync.service';
 import { colors } from '@/constants/Colors';
 
 // Custom SVG Icons
@@ -41,10 +41,6 @@ function PlusCircleIcon({ size = 24 }: { size?: number }) {
     </Svg>
   );
 }
-
-// Module-level cache to persist exercises across modal opens
-let cachedExercises: Exercise[] | null = null;
-let isFetching = false;
 
 // Map workout types to relevant muscle groups
 const WORKOUT_MUSCLE_MAP: Record<string, string[]> = {
@@ -83,7 +79,7 @@ export default function ExercisePicker({
   const [searchQuery, setSearchQuery] = useState('');
   // 'workout' = workout-specific filter, null = all, string = specific muscle group
   const [selectedFilter, setSelectedFilter] = useState<'workout' | null | string>('workout');
-  const [databaseExercises, setDatabaseExercises] = useState<Exercise[]>(cachedExercises || []);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [isLoadingExercises, setIsLoadingExercises] = useState(false);
 
   // Get muscles for the current workout type
@@ -106,63 +102,26 @@ export default function ExercisePicker({
     }
   }, [visible, workoutMuscles.length]);
 
-  // Fetch exercises from database when modal opens (only if not cached)
+  // Sync and fetch exercises when modal opens
+  // syncAndFetchExercises has internal caching, so redundant calls return immediately
   useEffect(() => {
-    if (visible && !cachedExercises && !isFetching) {
-      loadExercisesFromDatabase();
+    if (visible && exercises.length === 0) {
+      loadExercises();
     }
   }, [visible]);
 
-  const loadExercisesFromDatabase = async () => {
-    isFetching = true;
+  const loadExercises = async () => {
     setIsLoadingExercises(true);
     try {
-      const exercises = await fetchExercisesFromDatabase();
-      if (exercises.length > 0) {
-        cachedExercises = exercises;
-        setDatabaseExercises(exercises);
-      }
+      // syncAndFetchExercises handles caching internally
+      const syncedExercises = await syncAndFetchExercises();
+      setExercises(syncedExercises);
     } catch (error) {
-      console.error('Failed to fetch exercises from database:', error);
+      console.error('Failed to sync/fetch exercises:', error);
     } finally {
-      isFetching = false;
       setIsLoadingExercises(false);
     }
   };
-
-  // Combine database exercises with local exercises, removing duplicates
-  const allExercises = useMemo(() => {
-    // Convert local exercises to Exercise format
-    const localAsExercises: Exercise[] = DEFAULT_EXERCISES.map((def) => {
-      // Include equipment in ID to make exercises with same name unique
-      const equipmentSuffix = def.equipment.length > 0 ? `-${def.equipment[0]}` : '-bodyweight';
-      return {
-        id: `local-${def.name.toLowerCase().replace(/\s+/g, '-')}${equipmentSuffix}`,
-        name: def.name,
-        description: def.description,
-        exercise_type: def.exerciseType,
-        muscle_group: def.muscleGroup,
-        equipment: def.equipment,
-        is_compound: def.isCompound,
-        created_by: null,
-        is_public: true,
-        created_at: new Date().toISOString(),
-      };
-    });
-
-    // If we have database exercises, merge with local (database takes precedence for duplicates)
-    let combined: Exercise[];
-    if (databaseExercises.length > 0) {
-      const dbNames = new Set(databaseExercises.map(e => e.name.toLowerCase()));
-      const uniqueLocal = localAsExercises.filter(e => !dbNames.has(e.name.toLowerCase()));
-      combined = [...databaseExercises, ...uniqueLocal];
-    } else {
-      combined = localAsExercises;
-    }
-
-    // Sort alphabetically by name
-    return combined.sort((a, b) => a.name.localeCompare(b.name));
-  }, [databaseExercises]);
 
   const filteredExercises = useMemo(() => {
     const matchesMuscleFilter = (muscleGroup: string): boolean => {
@@ -175,14 +134,14 @@ export default function ExercisePicker({
       return muscleGroup === selectedFilter;
     };
 
-    return allExercises.filter((exercise) => {
+    return exercises.filter((exercise) => {
       const matchesSearch = exercise.name
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
       const matchesMuscle = matchesMuscleFilter(exercise.muscle_group);
       return matchesSearch && matchesMuscle;
     });
-  }, [searchQuery, selectedFilter, workoutMuscles, allExercises]);
+  }, [searchQuery, selectedFilter, workoutMuscles, exercises]);
 
   const handleSelectExercise = (exercise: Exercise) => {
     onSelectExercise(exercise);

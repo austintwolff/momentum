@@ -1,44 +1,44 @@
 // Default exercises for each workout type
-// Exercise names must match those in exercises.ts
+// Exercise names must match those in the exercises database
 
 export interface DefaultWorkoutExercise {
   name: string;
-  equipment?: string; // To disambiguate exercises with same name
 }
 
 export const DEFAULT_WORKOUT_EXERCISES: Record<string, DefaultWorkoutExercise[]> = {
   'Push': [
-    { name: 'Bench Press (Barbell)' },
-    { name: 'Incline Bench Press (Dumbbell)' },
-    { name: 'Landmine Pushes' },
-    { name: 'Triceps Pushdown (Cable - Straight Bar)' },
-    { name: 'Triceps Extension (Machine)' },
-    { name: 'Incline Bench Press (Barbell)' },
+    { name: 'Bench Press' },
+    { name: 'Incline Bench Press' },
+    { name: 'Shoulder Press' },
     { name: 'Chest Fly' },
+    { name: 'Triceps Pushdown' },
+    { name: 'Triceps Extension' },
+    { name: 'Lateral Raises' },
   ],
   'Pull': [
-    { name: 'Lat Pulldown (Cable)' },
-    { name: 'T Bar Row' },
-    { name: 'Lat Pushdown' },
-    { name: 'Bicep Curl (Barbell)' },
-    { name: 'Low Row (Plate Loaded)' },
-    { name: 'Seated Row (Cable)' },
-    { name: 'Pull Up' },
+    { name: 'Lat Pulldown' },
+    { name: 'Seated Cable Row' },
+    { name: 'Dumbbell Row' },
+    { name: 'Barbell Row' },
+    { name: 'Face Pulls' },
+    { name: 'Barbell Curl' },
+    { name: 'Hammer Curl' },
   ],
   'Legs': [
-    { name: 'Squat (Barbell)' },
-    { name: 'Leg Extension (Machine)' },
-    { name: 'Seated Leg Curl (Machine)' },
-    { name: 'Front Squat (Barbell)' },
+    { name: 'Squat' },
+    { name: 'Leg Press' },
+    { name: 'Leg Extension' },
+    { name: 'Leg Curl' },
+    { name: 'Romanian Deadlift' },
+    { name: 'Hip Thrust' },
   ],
   'Full Body': [
-    { name: 'Bench Press (Barbell)' },
-    { name: 'Lat Pulldown (Cable)' },
-    { name: 'Bicep Curl (Barbell)' },
-    { name: 'Shoulder Press (Plate Loaded)' },
-    { name: 'One Arm Row (Cable)' },
-    { name: 'Incline Bench Press (Dumbbell)' },
-    { name: 'Squat (Barbell)' },
+    { name: 'Bench Press' },
+    { name: 'Lat Pulldown' },
+    { name: 'Squat' },
+    { name: 'Overhead Press' },
+    { name: 'Barbell Row' },
+    { name: 'Barbell Curl' },
   ],
 };
 

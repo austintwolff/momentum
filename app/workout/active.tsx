@@ -165,6 +165,18 @@ export default function ActiveWorkoutScreen() {
               router.replace({
                 pathname: '/workout/summary',
                 params: {
+                  workoutScore: (saveResult.workoutScore ?? 0).toString(),
+                  progressScore: (saveResult.progressScore ?? 0).toString(),
+                  maintenanceBonus: (saveResult.maintenanceBonus ?? 0).toString(),
+                  workScore: (saveResult.workScore ?? 0).toString(),
+                  consistencyScore: (saveResult.consistencyScore ?? 0).toString(),
+                  eprPrCount: (saveResult.eprPrCount ?? 0).toString(),
+                  weightPrCount: (saveResult.weightPrCount ?? 0).toString(),
+                  nearPRCount: (saveResult.nearPRCount ?? 0).toString(),
+                  closenessRatio: (saveResult.closenessRatio ?? 0).toString(),
+                  topPerformerName: saveResult.topPerformerName ?? '',
+                  topPerformerPercent: (saveResult.topPerformerPercent ?? 0).toString(),
+                  totalVolume: finishedWorkout.totalVolume.toString(),
                   totalSets: finishedWorkout.exercises
                     .reduce((sum, ex) => sum + ex.sets.length, 0)
                     .toString(),

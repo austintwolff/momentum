@@ -2,7 +2,8 @@
  * Workout Score Calculation Service
  *
  * Calculates a workout score (1-100) based on:
- * - Progress Score (0-55): PRs + closeness to PR
+ * - Progress Score (0-55): PRs (0-40) + closeness to PR (0-25) + near-PR bonus (0-9), capped at 55
+ * - Maintenance Bonus (0-19): Rewards high-effort workouts near PR range without actual PRs
  * - Work Score (0-40): Effective volume
  * - Consistency Score (0-5): Workout frequency
  */
@@ -36,12 +37,15 @@ export interface SetData {
 export interface WorkoutScoreResult {
   finalScore: number;
   progressScore: number;
+  maintenanceBonus: number;
   workScore: number;
   consistencyScore: number;
   effectiveSetCount: number;
   nEPR: number;
   nWPR: number;
+  nearPRCount: number;
   closenessAggregateRatio: number;
+  topPerformer: { name: string; closenessPercent: number } | null;
   exerciseScores: ExerciseScoreData[];
 }
 
@@ -67,24 +71,46 @@ const EPR_MIN_ABSOLUTE_IMPROVEMENT_KG = 1.0; // ~2.2 lbs
 const EPR_MIN_ABSOLUTE_IMPROVEMENT_LBS = 2.5;
 
 // Eligible rep range for EPR calculation
-const EPR_MIN_REPS = 3;
+const EPR_MIN_REPS = 1; // Include heavy singles/doubles
 const EPR_MAX_REPS = 12;
 
 // PR point values
-const BASE_EPR_VALUE = 12;
-const BASE_WPR_VALUE = 6;
+const BASE_EPR_VALUE = 10;
+const BASE_WPR_VALUE = 8;
 
 // Diminishing returns multipliers for PR events
 const PR_MULTIPLIERS = [1.0, 0.85, 0.70, 0.55, 0.45, 0.35, 0.30, 0.25, 0.22, 0.20];
 
-// Closeness to PR mapping
+// Closeness to PR mapping (more generous brackets for maintenance days)
 const CLOSENESS_BRACKETS = [
   { min: 1.00, points: 1.00 },
-  { min: 0.98, points: 0.80 },
-  { min: 0.95, points: 0.53 },
-  { min: 0.90, points: 0.27 },
+  { min: 0.98, points: 0.85 },
+  { min: 0.95, points: 0.65 },
+  { min: 0.90, points: 0.45 },
+  { min: 0.85, points: 0.30 },
+  { min: 0.80, points: 0.15 },
   { min: 0.00, points: 0.00 },
 ];
+
+// Max closeness score component
+const CLOSENESS_MAX = 25;
+
+// Neutral closeness score for exercises without a baseline
+const NO_BASELINE_CLOSENESS_POINTS = 0.5;
+
+// Near-PR bonus: reward exercises at 98-99.9% of baseline
+const NEAR_PR_BONUS = 3;
+const NEAR_PR_MAX = 9;
+
+// Maintenance bonus: rewards high-effort workouts near PR range without actual PRs
+// Scales down as PR points increase
+const MAINTENANCE_BONUS_TIERS = [
+  { minCloseness: 0.95, points: 19 },
+  { minCloseness: 0.90, points: 16 },
+  { minCloseness: 0.85, points: 12 },
+  { minCloseness: 0.80, points: 6 },
+];
+const MAINTENANCE_PR_DIVISOR = 40; // How quickly maintenance bonus decreases with PRs
 
 // Consistency score mapping
 const CONSISTENCY_MAP: Record<number, number> = {
@@ -113,10 +139,15 @@ export async function calculateWorkoutScore(
 
   // Fetch historical data for all exercises
   const exerciseIds = Array.from(exerciseMap.keys());
+  console.log('[Score] Fetching data for exercise IDs:', exerciseIds);
+
   const [priorMaxWeights, baselineData] = await Promise.all([
     fetchPriorMaxWeights(userId, exerciseIds, completedAt),
     fetchBaselineE1RMs(userId, exerciseIds, completedAt),
   ]);
+
+  console.log('[Score] Prior max weights:', Object.fromEntries(priorMaxWeights));
+  console.log('[Score] Baseline E1RMs:', Object.fromEntries(baselineData));
 
   // Calculate per-exercise metrics
   const exercises: ExerciseData[] = [];
@@ -184,14 +215,38 @@ export async function calculateWorkoutScore(
       didEPRPR,
       closenessRatio,
     });
+
+    console.log(`[Score] ${exerciseName}: baseline=${baselineE1RM}, today=${todayBestE1RM}, closeness=${closenessRatio}, weightPR=${didWeightPR}, eprPR=${didEPRPR}`);
   }
 
   // Count PRs
   const nEPR = exercises.filter(e => e.didEPRPR).length;
   const nWPR = exercises.filter(e => e.didWeightPR).length;
 
-  // Calculate Progress Score
-  const progressScore = calculateProgressScore(exercises);
+  // Count near-PR lifts (98-99.9% of baseline, not a PR)
+  const nearPRCount = exercises.filter(e =>
+    e.closenessRatio !== null &&
+    e.closenessRatio >= 0.98 &&
+    e.closenessRatio < 1.00 &&
+    !e.didEPRPR
+  ).length;
+
+  // Find top performer (exercise with highest closeness ratio)
+  let topPerformer: { name: string; closenessPercent: number } | null = null;
+  for (const exercise of exercises) {
+    if (exercise.closenessRatio !== null) {
+      const closenessPercent = Math.round(exercise.closenessRatio * 100);
+      if (topPerformer === null || closenessPercent > topPerformer.closenessPercent) {
+        topPerformer = {
+          name: exercise.exerciseName,
+          closenessPercent,
+        };
+      }
+    }
+  }
+
+  // Calculate Progress Score (includes near-PR bonus)
+  const { progressScore, prPoints } = calculateProgressScore(exercises);
 
   // Calculate Work Score
   const { workScore, effectiveSetCount } = calculateWorkScore(sets);
@@ -202,9 +257,12 @@ export async function calculateWorkoutScore(
   // Calculate closeness aggregate
   const closenessAggregateRatio = calculateClosenessAggregate(exercises);
 
+  // Calculate Maintenance Bonus (scales down with PRs)
+  const maintenanceBonus = calculateMaintenanceBonus(exercises, prPoints);
+
   // Calculate final score
   const finalScore = Math.max(1, Math.min(100,
-    progressScore + workScore + consistencyScore
+    progressScore + maintenanceBonus + workScore + consistencyScore
   ));
 
   // Build exercise scores for storage
@@ -221,21 +279,24 @@ export async function calculateWorkoutScore(
   return {
     finalScore: Math.round(finalScore),
     progressScore: Math.round(progressScore),
+    maintenanceBonus: Math.round(maintenanceBonus),
     workScore: Math.round(workScore),
     consistencyScore: Math.round(consistencyScore),
     effectiveSetCount: Math.round(effectiveSetCount * 100) / 100,
     nEPR,
     nWPR,
+    nearPRCount,
     closenessAggregateRatio: Math.round(closenessAggregateRatio * 1000) / 1000,
+    topPerformer,
     exerciseScores,
   };
 }
 
 // ============================================================================
-// PROGRESS SCORE (0-55)
+// PROGRESS SCORE (0-55): PRs (0-40) + Closeness (0-25) + Near-PR (0-9), capped at 55
 // ============================================================================
 
-function calculateProgressScore(exercises: ExerciseData[]): number {
+function calculateProgressScore(exercises: ExerciseData[]): { progressScore: number; prPoints: number } {
   // PR Component (0-40)
   const prEvents: { type: 'epr' | 'weight'; value: number }[] = [];
 
@@ -264,26 +325,42 @@ function calculateProgressScore(exercises: ExerciseData[]): number {
 
   const prComponent = Math.min(40, Math.round(prPoints));
 
-  // Closeness Score (0-15)
+  // Closeness Score (0-CLOSENESS_MAX)
   const closenessAggregateRatio = calculateClosenessAggregate(exercises);
-  const closenessScore = Math.min(15, Math.round(15 * closenessAggregateRatio));
+  const closenessScore = Math.min(CLOSENESS_MAX, Math.round(CLOSENESS_MAX * closenessAggregateRatio));
+
+  // Near-PR Bonus: +3 per exercise at 98-99.9% of baseline (max +9)
+  let nearPRBonus = 0;
+  for (const exercise of exercises) {
+    if (exercise.closenessRatio !== null &&
+        exercise.closenessRatio >= 0.98 &&
+        exercise.closenessRatio < 1.00 &&
+        !exercise.didEPRPR) {
+      nearPRBonus += NEAR_PR_BONUS;
+    }
+  }
+  nearPRBonus = Math.min(NEAR_PR_MAX, nearPRBonus);
 
   // Total Progress Score
-  return Math.min(55, prComponent + closenessScore);
+  const progressScore = Math.min(55, prComponent + closenessScore + nearPRBonus);
+
+  return { progressScore, prPoints };
 }
 
 function calculateClosenessAggregate(exercises: ExerciseData[]): number {
-  const exercisesWithBaseline = exercises.filter(e =>
-    e.baselineE1RM !== null && e.closenessRatio !== null
-  );
-
-  if (exercisesWithBaseline.length === 0) {
+  if (exercises.length === 0) {
     return 0;
   }
 
   let totalPoints = 0;
-  for (const exercise of exercisesWithBaseline) {
-    const closeness = exercise.closenessRatio!;
+  for (const exercise of exercises) {
+    // Exercises without baseline get a neutral score instead of being excluded
+    if (exercise.baselineE1RM === null || exercise.closenessRatio === null) {
+      totalPoints += NO_BASELINE_CLOSENESS_POINTS;
+      continue;
+    }
+
+    const closeness = exercise.closenessRatio;
     let pointsRatio = 0;
 
     for (const bracket of CLOSENESS_BRACKETS) {
@@ -296,7 +373,46 @@ function calculateClosenessAggregate(exercises: ExerciseData[]): number {
     totalPoints += pointsRatio;
   }
 
-  return totalPoints / exercisesWithBaseline.length;
+  return totalPoints / exercises.length;
+}
+
+// ============================================================================
+// MAINTENANCE BONUS (0-19): High-effort workouts near PR range without PRs
+// ============================================================================
+
+function calculateMaintenanceBonus(exercises: ExerciseData[], prPoints: number): number {
+  // If there are significant PRs, maintenance bonus scales down
+  const prScaleFactor = Math.max(0, 1 - (prPoints / MAINTENANCE_PR_DIVISOR));
+
+  if (prScaleFactor <= 0) {
+    return 0;
+  }
+
+  // Calculate average closeness ratio (only for exercises with baselines)
+  const exercisesWithBaseline = exercises.filter(
+    e => e.closenessRatio !== null && e.baselineE1RM !== null
+  );
+
+  if (exercisesWithBaseline.length === 0) {
+    return 0;
+  }
+
+  const avgCloseness = exercisesWithBaseline.reduce(
+    (sum, e) => sum + (e.closenessRatio || 0),
+    0
+  ) / exercisesWithBaseline.length;
+
+  // Find applicable tier
+  let baseBonus = 0;
+  for (const tier of MAINTENANCE_BONUS_TIERS) {
+    if (avgCloseness >= tier.minCloseness) {
+      baseBonus = tier.points;
+      break;
+    }
+  }
+
+  // Apply PR scale factor
+  return Math.round(baseBonus * prScaleFactor);
 }
 
 // ============================================================================
@@ -413,7 +529,7 @@ async function fetchPriorMaxWeights(
 /**
  * Fetch baseline E1RM for EPR calculation
  *
- * Baseline = best eligible e1RM (3-12 reps) from:
+ * Baseline = best eligible e1RM (1-12 reps) from:
  * 1. Last 30 days (prior to this workout)
  * 2. If none, find most recent workout date with this exercise,
  *    then search 30 days ending on that date
