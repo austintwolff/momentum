@@ -10,21 +10,19 @@ import {
   TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import Animated from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
 import { colors } from '@/constants/Colors';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore } from '@/stores/settings.store';
-import { fetchExercisesFromDatabase, saveWorkoutToDatabase } from '@/services/workout.service';
-import { DEFAULT_EXERCISES } from '@/constants/exercises';
+import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet } from '@/services/workout.service';
+import { syncAndFetchExercises, clearExerciseCache } from '@/services/exercise-sync.service';
 import ExercisePicker from '@/components/workout/ExercisePicker';
+import ExerciseLogPopup, { DetailedSet } from '@/components/workout/ExerciseLogPopup';
 import { Exercise } from '@/types/database';
 import { GoalBucket } from '@/lib/points-engine';
-import { estimateExerciseXpGains, EstimatedMuscleXpGain } from '@/lib/muscle-xp';
-import { AnimatedMuscleSection } from '@/components/workout/AnimatedMuscleSection';
-import { getRecommendedExercises, getEquipmentType, EquipmentType } from '@/services/recommendation.service';
+import { getRecommendedExercises, getEquipmentType } from '@/services/recommendation.service';
 import { useWorkoutPreferencesStore } from '@/stores/workout-preferences.store';
 
 const DECK_LIMIT = 15; // Max exercises shown in deck view
@@ -165,7 +163,7 @@ export default function ExerciseDeckScreen() {
 
   const { user, profile, refreshUserStats } = useAuthStore();
   const { weightUnit } = useSettingsStore();
-  const { activeWorkout, startWorkout, addExercise, cancelWorkout, endWorkout, markExerciseCompleted } = useWorkoutStore();
+  const { activeWorkout, startWorkout, addExercise, cancelWorkout, endWorkout, markExerciseCompleted, saveSetsForExercise, logSimpleSets } = useWorkoutStore();
 
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
@@ -175,18 +173,17 @@ export default function ExerciseDeckScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Popup state for quick logging from list view
+  const [logPopupVisible, setLogPopupVisible] = useState(false);
+  const [logPopupExercise, setLogPopupExercise] = useState<Exercise | null>(null);
+
   // Animation state for exercise completion
   const [completingExerciseId, setCompletingExerciseId] = useState<string | null>(null);
   const returningFromExerciseRef = useRef<{ exerciseId: string; index: number } | null>(null);
   const completingCardIndexRef = useRef<number>(0);
 
-  // Muscle XP animation state
-  const [animatingCardId, setAnimatingCardId] = useState<string | null>(null);
-  const [muscleXpGains, setMuscleXpGains] = useState<EstimatedMuscleXpGain[]>([]);
-  const [pendingCompletion, setPendingCompletion] = useState<{
-    exerciseId: string;
-    index: number;
-  } | null>(null);
+  // Recent sets data for each exercise (keyed by exercise.id)
+  const [recentSetsMap, setRecentSetsMap] = useState<Map<string, RecentTopSet[]>>(new Map());
 
   const flatListRef = useRef<FlatList>(null);
   const listViewRef = useRef<FlatList>(null);
@@ -196,6 +193,7 @@ export default function ExerciseDeckScreen() {
   const goalMode = params.goal as 'Strength' | 'Hypertrophy' | 'Endurance' | undefined;
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Elapsed time timer
   useEffect(() => {
@@ -272,83 +270,26 @@ export default function ExerciseDeckScreen() {
     }, 300);
   }, [activeWorkout, profile?.id, markExerciseCompleted, exercises, workoutMuscleGroups, addExercise]);
 
-  // Get muscle data (simplified - no levels)
-  const getMuscleData = useCallback((muscleGroup: string) => {
-    return {
-      level: 0,
-      progress: 0,
-      isDecaying: false,
-    };
-  }, []);
-
-  // Handle muscle XP animation completion - trigger exercise completion
-  const handleMuscleXpAnimationComplete = useCallback((gains: EstimatedMuscleXpGain[]) => {
-    setAnimatingCardId(null);
-
-    if (pendingCompletion) {
-      const { exerciseId, index } = pendingCompletion;
-      setPendingCompletion(null);
-      handleExerciseComplete(exerciseId, index);
-    }
-  }, [pendingCompletion, handleExerciseComplete]);
-
-  // Detect returning from exercise screen
+  // Detect returning from exercise screen and mark as complete
   useFocusEffect(
     useCallback(() => {
-      // Check if we're returning from an exercise
       if (returningFromExerciseRef.current && activeWorkout) {
         const { exerciseId, index } = returningFromExerciseRef.current;
         const exerciseItem = activeWorkout.exercises.find(ex => ex.id === exerciseId);
 
         // Only trigger completion if exercise has sets (user actually logged something)
         if (exerciseItem && exerciseItem.sets.length > 0 && !exerciseItem.isCompleted) {
-          // Get muscles worked by this exercise
-          const muscles = getExerciseMuscles(exerciseItem.exercise);
-
-          // Count sets and PRs
-          const setCount = exerciseItem.sets.length;
-          const prCount = exerciseItem.sets.filter(s => s.isPR).length;
-
-          // Build current levels map from muscleLevels state
-          const currentLevelsMap = new Map<string, { level: number; progress: number }>();
-          muscles.forEach(muscle => {
-            const data = getMuscleData(muscle);
-            currentLevelsMap.set(muscle.toLowerCase(), {
-              level: data.level,
-              progress: data.progress,
-            });
-          });
-
-          // Calculate estimated XP gains
-          const gains = estimateExerciseXpGains(muscles, setCount, prCount, currentLevelsMap);
-
-          // Small delay to let the screen settle before animation
+          // Small delay to let the screen settle
           setTimeout(() => {
-            if (gains.length > 0) {
-              // Show muscle XP animation on the card, then complete
-              setMuscleXpGains(gains);
-              setPendingCompletion({ exerciseId, index });
-              setAnimatingCardId(exerciseId);
-            } else {
-              // No muscles to animate, go straight to completion
-              handleExerciseComplete(exerciseId, index);
-            }
+            handleExerciseComplete(exerciseId, index);
           }, 100);
         }
 
         // Clear the ref
         returningFromExerciseRef.current = null;
       }
-    }, [activeWorkout, handleExerciseComplete, getMuscleData])
+    }, [activeWorkout, handleExerciseComplete])
   );
-
-  // Initialize workout on mount
-  useEffect(() => {
-    if (!activeWorkout && !isInitialized) {
-      const goal: GoalBucket = goalMode || 'Hypertrophy';
-      startWorkout(workoutName, goal);
-    }
-  }, [activeWorkout, workoutName, goalMode, isInitialized]);
 
   // Get workout preferences
   const { getExercisesForWorkout } = useWorkoutPreferencesStore();
@@ -363,49 +304,49 @@ export default function ExerciseDeckScreen() {
     return '';
   }, [workoutName]);
 
-  // Load exercises and populate deck based on workout type with user preferences
+  // Combined initialization effect - handles full flow in proper sequence
   useEffect(() => {
-    async function loadAndPopulateDeck() {
-      // Wait for workout to be initialized and user to be logged in
-      if (!activeWorkout || isInitialized || !profile?.id) return;
+    async function initializeWorkout() {
+      // Guard: Already initialized
+      if (isInitialized) {
+        setIsLoading(false);
+        return;
+      }
 
-      const dbExercises = await fetchExercisesFromDatabase();
+      // Guard: Need profile to load personalized deck
+      if (!profile?.id) {
+        console.log('[Deck] Waiting for profile...');
+        return;
+      }
 
-      // Convert local exercises to Exercise format
-      const localExercises: Exercise[] = DEFAULT_EXERCISES.map((ex, index) => ({
-        id: `local-${index}`,
-        name: ex.name,
-        description: ex.description,
-        exercise_type: ex.exerciseType,
-        muscle_group: ex.muscleGroup,
-        equipment: ex.equipment,
-        is_compound: ex.isCompound,
-        created_by: null,
-        is_public: true,
-        created_at: new Date().toISOString(),
-      }));
+      // Step 1: Start workout if needed
+      if (!activeWorkout) {
+        console.log('[Deck] Starting workout...');
+        const goal: GoalBucket = goalMode || 'Hypertrophy';
+        startWorkout(workoutName, goal);
+        // Don't continue - wait for next render with activeWorkout
+        return;
+      }
 
-      // Merge: database takes precedence
-      const dbNames = new Set(dbExercises.map(e => e.name.toLowerCase()));
-      const allExercises = [
-        ...dbExercises,
-        ...localExercises.filter(e => !dbNames.has(e.name.toLowerCase())),
-      ];
+      // Step 2: Load exercises
+      console.log('[Deck] Loading exercises...');
+      setIsLoading(true);
 
-      // Store all exercises for list view
+      // Clear cache to ensure fresh data on new workout
+      clearExerciseCache();
+      const allExercises = await syncAndFetchExercises();
+
+      console.log(`[Deck] Loaded ${allExercises.length} exercises`);
       setExercises(allExercises);
 
-      // Get user's preferred exercises for this workout type
+      // Step 3: Populate deck with preferred + recommended exercises
       const preferredExerciseNames = workoutType ? getExercisesForWorkout(workoutType) : [];
 
-      // Find matching exercises from the pool (fuzzy match - DB names may have equipment suffix)
+      // Find matching exercises from the pool
       const preferredExercises = preferredExerciseNames
         .map(name => {
           const nameLower = name.toLowerCase();
-          // Try exact match first, then prefix match (e.g., "Bench Press" matches "Bench Press (Barbell)")
-          return allExercises.find(ex => ex.name.toLowerCase() === nameLower) ||
-                 allExercises.find(ex => ex.name.toLowerCase().startsWith(nameLower + ' (') ||
-                                         ex.name.toLowerCase().startsWith(nameLower + '('));
+          return allExercises.find(ex => ex.name.toLowerCase() === nameLower);
         })
         .filter((ex): ex is Exercise => ex !== undefined);
 
@@ -434,10 +375,38 @@ export default function ExerciseDeckScreen() {
       }
 
       setIsInitialized(true);
+      setIsLoading(false);
+      console.log('[Deck] Initialization complete');
     }
 
-    loadAndPopulateDeck();
-  }, [activeWorkout, workoutMuscleGroups, isInitialized, addExercise, profile?.id, workoutType, getExercisesForWorkout]);
+    initializeWorkout();
+  }, [profile?.id, activeWorkout, isInitialized, workoutName, goalMode, workoutType, workoutMuscleGroups, addExercise, getExercisesForWorkout, startWorkout]);
+
+  // Fetch recent sets for exercises in the deck
+  useEffect(() => {
+    async function fetchRecentSets() {
+      if (!activeWorkout || !user?.id) return;
+
+      const newMap = new Map(recentSetsMap);
+      let hasChanges = false;
+
+      for (const exerciseItem of activeWorkout.exercises) {
+        const exerciseId = exerciseItem.exercise.id;
+        // Skip if we already have data for this exercise
+        if (newMap.has(exerciseId)) continue;
+
+        const recentSets = await getTopRecentSetsForExercise(user.id, exerciseId, 14, 5);
+        newMap.set(exerciseId, recentSets);
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
+        setRecentSetsMap(newMap);
+      }
+    }
+
+    fetchRecentSets();
+  }, [activeWorkout?.exercises.length, user?.id]);
 
   // Handle exercise selection from picker
   const handleSelectExercise = useCallback((exercise: Exercise) => {
@@ -458,7 +427,7 @@ export default function ExerciseDeckScreen() {
       // Track which exercise we're navigating to
       returningFromExerciseRef.current = { exerciseId: exerciseItem.id, index };
     }
-    router.push(`/workout/exercise?index=${index}`);
+    router.push(`/workout/exercise-v2?index=${index}`);
   }, [router, activeWorkout]);
 
   // Handle cancel workout
@@ -522,10 +491,15 @@ export default function ExerciseDeckScreen() {
                 params: {
                   workoutScore: (saveResult.workoutScore ?? 0).toString(),
                   progressScore: (saveResult.progressScore ?? 0).toString(),
+                  maintenanceBonus: (saveResult.maintenanceBonus ?? 0).toString(),
                   workScore: (saveResult.workScore ?? 0).toString(),
                   consistencyScore: (saveResult.consistencyScore ?? 0).toString(),
                   eprPrCount: (saveResult.eprPrCount ?? 0).toString(),
                   weightPrCount: (saveResult.weightPrCount ?? 0).toString(),
+                  nearPRCount: (saveResult.nearPRCount ?? 0).toString(),
+                  closenessRatio: (saveResult.closenessRatio ?? 0).toString(),
+                  topPerformerName: saveResult.topPerformerName ?? '',
+                  topPerformerPercent: (saveResult.topPerformerPercent ?? 0).toString(),
                   totalVolume: Math.round(finishedWorkout.totalVolume).toString(),
                   totalSets: finishedWorkout.exercises
                     .reduce((sum, ex) => sum + ex.sets.length, 0)
@@ -617,21 +591,31 @@ export default function ExerciseDeckScreen() {
     };
   }, [deckExercises]);
 
+  // Format date for recent sets display
+  const formatSetDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   const renderCard = useCallback(({ item, index }: { item: any; index: number }) => {
     const exercise = item.exercise as Exercise;
     const muscles = getExerciseMuscles(exercise);
     const setsCompleted = item.sets.length;
     const equipmentType = getEquipmentType(exercise.equipment, exercise.exercise_type);
     const isCompleted = item.isCompleted;
+    const isBodyweight = exercise.exercise_type === 'bodyweight';
 
-    // Get best set for PR display
+    // Get best set by e1RM from current workout
     const bestSet = item.sets.length > 0
       ? item.sets.reduce((best: any, set: any) => {
-          const setVolume = (set.weight || 0) * set.reps;
-          const bestVolume = (best.weight || 0) * best.reps;
-          return setVolume > bestVolume ? set : best;
+          const setE1RM = calculateE1RM(set.weight || 0, set.reps);
+          const bestE1RM = calculateE1RM(best.weight || 0, best.reps);
+          return setE1RM > bestE1RM ? set : best;
         }, item.sets[0])
       : null;
+
+    // Get recent top sets for this exercise
+    const recentSets = recentSetsMap.get(exercise.id) || [];
 
     return (
       <View
@@ -660,13 +644,13 @@ export default function ExerciseDeckScreen() {
             {exercise.name}
           </Text>
 
-          {/* Stats Row: PR | Total Sets */}
+          {/* Stats Row: Best Set | Total Sets */}
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Best</Text>
+              <Text style={styles.statLabel}>Best Set</Text>
               <Text style={styles.statValue}>
                 {bestSet
-                  ? bestSet.isBodyweight
+                  ? isBodyweight
                     ? `${bestSet.reps} reps`
                     : `${bestSet.weight}${weightUnit} × ${bestSet.reps}`
                   : '—'}
@@ -674,7 +658,7 @@ export default function ExerciseDeckScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Sets</Text>
+              <Text style={styles.statLabel}>Total Sets</Text>
               <Text style={[styles.statValue, { fontVariant: ['tabular-nums'] }]}>
                 {setsCompleted}
               </Text>
@@ -682,23 +666,38 @@ export default function ExerciseDeckScreen() {
           </View>
         </View>
 
-        {/* Fixed Muscle Section */}
-        <View style={[styles.muscleSection, isCompleted && { opacity: 0.4 }]}>
-          <AnimatedMuscleSection
-            muscles={muscles.map(muscle => {
-              const data = getMuscleData(muscle);
-              return {
-                muscle,
-                level: data.level,
-                progress: data.progress,
-                isDecaying: data.isDecaying,
-              };
-            })}
-            isAnimating={animatingCardId === item.id}
-            animationGains={animatingCardId === item.id ? muscleXpGains : null}
-            onAnimationComplete={handleMuscleXpAnimationComplete}
-            isDark={isDark}
-          />
+        {/* Muscle Tags */}
+        <View style={[styles.muscleTagsContainer, isCompleted && { opacity: 0.4 }]}>
+          {muscles.map((muscle, idx) => (
+            <View key={idx} style={styles.muscleTag}>
+              <Text style={styles.muscleTagText}>
+                {MUSCLE_DISPLAY_NAMES[muscle] || muscle}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Top Recent Sets Section */}
+        <View style={[styles.recentSetsSection, isCompleted && { opacity: 0.4 }]}>
+          <Text style={styles.recentSetsTitle}>Top Recent Sets (14 days)</Text>
+          {recentSets.length > 0 ? (
+            <View style={styles.recentSetsList}>
+              {recentSets.slice(0, 4).map((set, idx) => (
+                <View key={idx} style={styles.recentSetRow}>
+                  <Text style={styles.recentSetWeight}>
+                    {isBodyweight
+                      ? `${set.reps} reps`
+                      : `${Math.round(set.weight)}${weightUnit} × ${set.reps}`}
+                  </Text>
+                  <Text style={styles.recentSetDate}>
+                    {formatSetDate(set.date)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.recentSetsEmpty}>No recent data</Text>
+          )}
         </View>
 
         {/* Start Exercise Button or Completed State */}
@@ -721,22 +720,69 @@ export default function ExerciseDeckScreen() {
         )}
       </View>
     );
-  }, [getMuscleData, handleStartExercise, weightUnit, animatingCardId, muscleXpGains, handleMuscleXpAnimationComplete]);
+  }, [handleStartExercise, weightUnit, recentSetsMap]);
 
-  // Handle starting an exercise from the list view
+  // Handle starting an exercise from the list view - opens popup
   const handleStartFromList = useCallback((exercise: Exercise) => {
-    let deckIndex = getDeckIndex(exercise.id);
+    setLogPopupExercise(exercise);
+    setLogPopupVisible(true);
+  }, []);
 
-    // If exercise is not in deck, add it first
+  // Handle finishing an exercise from the popup
+  const handleFinishExerciseFromPopup = useCallback((
+    setCount: number,
+    detailedSets?: DetailedSet[]
+  ) => {
+    if (!logPopupExercise || !profile) return;
+
+    // Get or add exercise to deck
+    let deckIndex = getDeckIndex(logPopupExercise.id);
     if (deckIndex === -1) {
-      addExercise(exercise);
-      // The new exercise will be at the end of the deck
+      addExercise(logPopupExercise);
       deckIndex = deckExercises.length;
     }
 
-    // Navigate to the exercise
-    router.push(`/workout/exercise?index=${deckIndex}`);
-  }, [getDeckIndex, addExercise, deckExercises.length, router]);
+    // Need to wait a tick for the exercise to be added to the store
+    setTimeout(() => {
+      const currentDeckIndex = deckIndex === deckExercises.length ? deckIndex : deckIndex;
+
+      if (detailedSets && detailedSets.some(s => s.reps || s.weight)) {
+        // Detailed logging - convert DetailedSet[] to the format saveSetsForExercise expects
+        const setsToSave = detailedSets
+          .filter(s => s.reps || s.weight) // Only save sets with data
+          .map((s, i) => ({
+            id: s.id,
+            weight: s.weight ? parseFloat(s.weight) : null,
+            reps: parseInt(s.reps) || 0,
+            isWarmup: false,
+          }));
+
+        if (setsToSave.length > 0) {
+          saveSetsForExercise({
+            exerciseIndex: currentDeckIndex,
+            sets: setsToSave,
+            userBodyweight: profile.bodyweight_kg || 70,
+          });
+        }
+      } else {
+        // Simple count-only logging
+        logSimpleSets({
+          exerciseIndex: currentDeckIndex,
+          setCount,
+        });
+      }
+
+      // Mark exercise completed
+      const exerciseItem = activeWorkout?.exercises[currentDeckIndex];
+      if (exerciseItem) {
+        markExerciseCompleted(exerciseItem.id);
+      }
+
+      // Close popup
+      setLogPopupVisible(false);
+      setLogPopupExercise(null);
+    }, 50);
+  }, [logPopupExercise, profile, getDeckIndex, addExercise, deckExercises.length, saveSetsForExercise, logSimpleSets, markExerciseCompleted, activeWorkout]);
 
   // Render list view row (shows full pool of exercises)
   const renderListRow = useCallback(({ item }: { item: Exercise }) => {
@@ -888,7 +934,13 @@ export default function ExerciseDeckScreen() {
       </View>
 
       {/* Exercise Deck or List View */}
-      {viewMode === 'deck' ? (
+      {isLoading ? (
+        <View style={styles.deckContainer}>
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading exercises...</Text>
+          </View>
+        </View>
+      ) : viewMode === 'deck' ? (
         <View style={styles.deckContainer}>
           {deckExercises.length === 0 ? (
             renderEmptyState()
@@ -993,6 +1045,18 @@ export default function ExerciseDeckScreen() {
         onSelectExercise={handleSelectExercise}
         workoutName={workoutName}
       />
+
+      {/* Exercise Log Popup for quick logging from list view */}
+      <ExerciseLogPopup
+        visible={logPopupVisible}
+        exercise={logPopupExercise}
+        onClose={() => {
+          setLogPopupVisible(false);
+          setLogPopupExercise(null);
+        }}
+        onFinish={handleFinishExerciseFromPopup}
+        weightUnit={weightUnit}
+      />
     </SafeAreaView>
   );
 }
@@ -1046,6 +1110,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
+  },
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
   },
   // Deck
   deckContainer: {
@@ -1141,60 +1215,61 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: colors.border,
   },
-  // Muscle Section - Fixed position
-  muscleSection: {
-    flex: 1,
+  // Muscle Tags
+  muscleTagsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 12,
   },
-  sectionTitle: {
+  muscleTag: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: colors.bgTertiary,
+  },
+  muscleTagText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  // Recent Sets Section
+  recentSetsSection: {
+    flex: 1,
+    backgroundColor: colors.bgTertiary,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  recentSetsTitle: {
     fontSize: 11,
     fontWeight: '600',
     textTransform: 'uppercase',
-    marginBottom: 10,
+    color: colors.textMuted,
+    marginBottom: 8,
   },
-  // Muscle Cards (like progress screen)
-  muscleCards: {
-    gap: 8,
+  recentSetsList: {
+    gap: 6,
   },
-  muscleCard: {
-    padding: 10,
-    borderRadius: 10,
-  },
-  muscleHeader: {
+  recentSetRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
   },
-  muscleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  muscleIcon: {
-    fontSize: 18,
-  },
-  muscleName: {
-    fontSize: 15,
+  recentSetWeight: {
+    fontSize: 14,
     fontWeight: '600',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
   },
-  progressContainer: {
-    gap: 4,
+  recentSetDate: {
+    fontSize: 12,
+    color: colors.textMuted,
   },
-  progressBg: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 3,
-  },
-  progressFillMax: {
-    backgroundColor: colors.warning,
-  },
-  progressFillResting: {
-    backgroundColor: colors.textMuted,
+  recentSetsEmpty: {
+    fontSize: 13,
+    color: colors.textMuted,
+    fontStyle: 'italic',
   },
   // Start Button
   startButton: {

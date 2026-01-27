@@ -66,6 +66,22 @@ interface WorkoutState {
     muscleGroups?: string[];
   }) => { isPR: boolean } | null;
 
+  saveSetsForExercise: (params: {
+    exerciseIndex: number;
+    sets: Array<{
+      id: string;
+      weight: number | null;
+      reps: number;
+      isWarmup: boolean;
+    }>;
+    userBodyweight: number;
+  }) => { prCount: number };
+
+  logSimpleSets: (params: {
+    exerciseIndex: number;
+    setCount: number;
+  }) => void;
+
   startRestTimer: (seconds: number) => void;
   stopRestTimer: () => void;
   tickRestTimer: () => void;
@@ -256,6 +272,160 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     });
 
     return { isPR: prResult.isPR };
+  },
+
+  saveSetsForExercise: (params) => {
+    const { activeWorkout, exerciseBaselines } = get();
+    if (!activeWorkout || activeWorkout.exercises.length === 0) return { prCount: 0 };
+
+    const currentExercise = activeWorkout.exercises[params.exerciseIndex];
+    if (!currentExercise) return { prCount: 0 };
+
+    const exercise = currentExercise.exercise;
+    const isBodyweight = exercise.exercise_type === 'bodyweight';
+    const primaryMuscle = exercise.muscle_group;
+    const muscleGroups = [primaryMuscle];
+
+    // Get baseline for PR detection
+    const baseline = exerciseBaselines.get(exercise.id) || null;
+
+    let prCount = 0;
+    let totalVolumeAdded = 0;
+
+    // Create new WorkoutSets from the provided sets
+    const newSets: WorkoutSet[] = params.sets.map((set, index) => {
+      // Check for PR (only for non-warmup sets)
+      const effectiveWeight = isBodyweight
+        ? params.userBodyweight * POINTS_CONFIG.BODYWEIGHT_FACTOR
+        : (set.weight || 0);
+
+      const prResult = !set.isWarmup
+        ? checkForPR(effectiveWeight, set.reps, activeWorkout.goal, baseline)
+        : { isPR: false };
+
+      if (prResult.isPR) prCount++;
+
+      // Calculate volume for this set
+      const setVolume = isBodyweight
+        ? params.userBodyweight * POINTS_CONFIG.BODYWEIGHT_FACTOR * set.reps
+        : (set.weight || 0) * set.reps;
+
+      totalVolumeAdded += setVolume;
+
+      return {
+        id: set.id,
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        setNumber: index + 1,
+        setType: set.isWarmup ? 'warmup' : 'working',
+        weight: set.weight,
+        reps: set.reps,
+        isBodyweight,
+        isPR: prResult.isPR,
+        completedAt: new Date(),
+        muscleGroups,
+      };
+    });
+
+    // Update the exercise with new sets (replacing any existing sets)
+    const updatedExercises = activeWorkout.exercises.map((ex, index) => {
+      if (index === params.exerciseIndex) {
+        return {
+          ...ex,
+          sets: newSets,
+        };
+      }
+      return ex;
+    });
+
+    // Calculate the volume difference (new - old)
+    const oldVolume = currentExercise.sets.reduce((sum, s) => {
+      const vol = s.isBodyweight
+        ? params.userBodyweight * POINTS_CONFIG.BODYWEIGHT_FACTOR * s.reps
+        : (s.weight || 0) * s.reps;
+      return sum + vol;
+    }, 0);
+
+    const volumeDiff = totalVolumeAdded - oldVolume;
+
+    // Update muscle set counts (based on working sets only)
+    const newMuscleSetsCount = new Map(activeWorkout.muscleSetsCount);
+    const oldWorkingSetCount = currentExercise.sets.filter(s => s.setType !== 'warmup').length;
+    const newWorkingSetCount = params.sets.filter(s => !s.isWarmup).length;
+    const setCountDiff = newWorkingSetCount - oldWorkingSetCount;
+
+    for (const muscle of muscleGroups) {
+      const current = newMuscleSetsCount.get(muscle) || 0;
+      newMuscleSetsCount.set(muscle, Math.max(0, current + setCountDiff));
+    }
+
+    set({
+      activeWorkout: {
+        ...activeWorkout,
+        exercises: updatedExercises,
+        totalVolume: activeWorkout.totalVolume + volumeDiff,
+        muscleSetsCount: newMuscleSetsCount,
+      },
+    });
+
+    return { prCount };
+  },
+
+  logSimpleSets: (params) => {
+    const { activeWorkout } = get();
+    if (!activeWorkout || activeWorkout.exercises.length === 0) return;
+
+    const currentExercise = activeWorkout.exercises[params.exerciseIndex];
+    if (!currentExercise) return;
+
+    const exercise = currentExercise.exercise;
+    const isBodyweight = exercise.exercise_type === 'bodyweight';
+    const primaryMuscle = exercise.muscle_group;
+    const muscleGroups = [primaryMuscle];
+
+    // Create simple WorkoutSets (null weight, 0 reps indicates count-only logging)
+    const newSets: WorkoutSet[] = Array.from({ length: params.setCount }, (_, index) => ({
+      id: uuidv4(),
+      exerciseId: exercise.id,
+      exerciseName: exercise.name,
+      setNumber: index + 1,
+      setType: 'working',
+      weight: null,
+      reps: 0,
+      isBodyweight,
+      isPR: false,
+      completedAt: new Date(),
+      muscleGroups,
+    }));
+
+    // Update the exercise with simple sets
+    const updatedExercises = activeWorkout.exercises.map((ex, index) => {
+      if (index === params.exerciseIndex) {
+        return {
+          ...ex,
+          sets: newSets,
+        };
+      }
+      return ex;
+    });
+
+    // Update muscle set counts
+    const newMuscleSetsCount = new Map(activeWorkout.muscleSetsCount);
+    const oldWorkingSetCount = currentExercise.sets.filter(s => s.setType !== 'warmup').length;
+    const setCountDiff = params.setCount - oldWorkingSetCount;
+
+    for (const muscle of muscleGroups) {
+      const current = newMuscleSetsCount.get(muscle) || 0;
+      newMuscleSetsCount.set(muscle, Math.max(0, current + setCountDiff));
+    }
+
+    set({
+      activeWorkout: {
+        ...activeWorkout,
+        exercises: updatedExercises,
+        muscleSetsCount: newMuscleSetsCount,
+      },
+    });
   },
 
   startRestTimer: (seconds: number) => {
