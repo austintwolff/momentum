@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgSecondary,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   header: {
     flexDirection: 'row',

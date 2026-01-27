@@ -59,7 +59,7 @@ const ROLLING_DAYS = 14;
 
 /**
  * Hook to fetch training frequency per muscle group over rolling 14-day period.
- * Returns muscles sorted by undertrained first (lowest percentage).
+ * Returns muscles sorted by most trained first (highest percentage).
  */
 export function useTrainingFrequency(): UseTrainingFrequencyResult {
   const { user } = useAuthStore();
@@ -174,8 +174,8 @@ export function useTrainingFrequency(): UseTrainingFrequencyResult {
         };
       });
 
-      // Sort by percentage ascending (undertrained first)
-      result.sort((a, b) => a.percentage - b.percentage);
+      // Sort by percentage descending (most trained first)
+      result.sort((a, b) => b.percentage - a.percentage);
 
       setMuscles(result);
       setIsLoading(false);

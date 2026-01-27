@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 32,
-    marginBottom: 16,
+    marginBottom: 32,
   },
 
   // Spacer

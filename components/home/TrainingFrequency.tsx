@@ -5,19 +5,22 @@ import { colors } from '@/constants/Colors';
 import { useTrainingFrequency, MuscleFrequency } from '@/hooks/useTrainingFrequency';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-const CARD_WIDTH = 100;
+const CARD_WIDTH = 90;
 const CARD_GAP = 8;
 const HORIZONTAL_PADDING = 16;
 
 // Mini dial component for muscle cards
-function MiniDial({ percentage, isComplete, size = 48 }: {
+function MiniDial({ percentage, isComplete, sessionsCount, targetSessions, size = 52 }: {
   percentage: number;
   isComplete: boolean;
+  sessionsCount: number;
+  targetSessions: number;
   size?: number;
 }) {
-  const strokeWidth = 3;
+  const strokeWidth = 4;
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
+  const innerRadius = radius - 8;
 
   // Arc spans 270 degrees (from 135° to 405°)
   const startAngle = 135;
@@ -46,20 +49,28 @@ function MiniDial({ percentage, isComplete, size = 48 }: {
   const backgroundArc = createArc(startAngle, endAngle);
   const progressArc = percentage > 0 ? createArc(startAngle, progressEndAngle) : '';
 
-  // Progress arc is always purple (accent) like the protein tracker
   const progressColor = colors.accent;
+  // Inner circle opacity based on progress (subtle purple glow)
+  const innerOpacity = 0.1 + (percentage / 100) * 0.15;
 
   return (
     <View style={[styles.dialWrapper, { width: size, height: size }]}>
       <Svg width={size} height={size}>
-        {/* Background arc - always visible */}
+        {/* Inner purple circle */}
+        <Circle
+          cx={center}
+          cy={center}
+          r={innerRadius}
+          fill={colors.accent}
+          opacity={innerOpacity}
+        />
+        {/* Background arc */}
         <Path
           d={backgroundArc}
-          stroke={colors.textMuted}
+          stroke={colors.bgSecondary}
           strokeWidth={strokeWidth}
           fill="none"
           strokeLinecap="round"
-          opacity={0.3}
         />
         {/* Progress arc */}
         {percentage > 0 && (
@@ -72,6 +83,12 @@ function MiniDial({ percentage, isComplete, size = 48 }: {
           />
         )}
       </Svg>
+      {/* Session count in center */}
+      <View style={styles.dialCenter}>
+        <Text style={[styles.dialCount, isComplete && styles.dialCountComplete]}>
+          {sessionsCount}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -82,16 +99,11 @@ function MuscleCard({ muscle }: { muscle: MuscleFrequency }) {
       <MiniDial
         percentage={muscle.percentage}
         isComplete={muscle.isComplete}
+        sessionsCount={muscle.sessionsCount}
+        targetSessions={muscle.targetSessions}
       />
-      <Text style={styles.sessionsText}>
-        <Text style={[
-          styles.sessionsCount,
-          muscle.isComplete && styles.sessionsCountComplete
-        ]}>
-          {muscle.sessionsCount}
-        </Text>
-        <Text style={styles.sessionsDivider}>/</Text>
-        <Text style={styles.sessionsTarget}>{muscle.targetSessions}</Text>
+      <Text style={styles.targetText}>
+        of {muscle.targetSessions}
       </Text>
       <Text style={styles.muscleName} numberOfLines={1}>
         {muscle.displayName}
@@ -194,47 +206,45 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     backgroundColor: colors.bgTertiary,
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',
-    gap: 4,
   },
   cardLoading: {
     opacity: 0.5,
   },
   dialWrapper: {
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sessionsText: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  dialCenter: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sessionsCount: {
-    fontSize: 14,
+  dialCount: {
+    fontSize: 18,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
-  sessionsCountComplete: {
+  dialCountComplete: {
     color: colors.accent,
   },
-  sessionsDivider: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.textMuted,
-  },
-  sessionsTarget: {
-    fontSize: 12,
-    fontWeight: '500',
-    fontVariant: ['tabular-nums'],
-    color: colors.textMuted,
-  },
-  muscleName: {
+  targetText: {
     fontSize: 11,
     fontWeight: '500',
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  muscleName: {
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
+    marginTop: 2,
   },
   emptyState: {
     paddingHorizontal: 12,
@@ -247,9 +257,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loadingDial: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: colors.bgSecondary,
   },
   loadingText: {
