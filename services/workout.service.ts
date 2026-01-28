@@ -316,9 +316,10 @@ export async function saveWorkoutToDatabase(
 
 export async function getWorkoutHistory(
   userId: string,
-  limit: number = 20
-): Promise<any[]> {
-  const { data, error } = await supabase
+  limit: number = 20,
+  offset: number = 0
+): Promise<{ data: any[]; hasMore: boolean; totalCount: number }> {
+  const { data, error, count } = await supabase
     .from('workout_sessions')
     .select(`
       *,
@@ -326,17 +327,21 @@ export async function getWorkoutHistory(
         *,
         exercise:exercises (name, muscle_group)
       )
-    `)
+    `, { count: 'exact' })
     .eq('user_id', userId)
     .order('started_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (error) {
     console.error('Error fetching workout history:', error);
-    return [];
+    return { data: [], hasMore: false, totalCount: 0 };
   }
 
-  return data || [];
+  return {
+    data: data || [],
+    hasMore: (data?.length || 0) === limit,
+    totalCount: count || 0,
+  };
 }
 
 export async function getExerciseHistory(
