@@ -1,209 +1,200 @@
-import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuthStore } from '@/stores/auth.store';
-import { getUserMuscleLevels } from '@/services/baseline.service';
-import {
-  xpForMuscleLevel,
-  MUSCLE_XP_CONFIG,
-  calculateMuscleDecay,
-  DecayStatus,
-} from '@/lib/muscle-xp';
-import { MuscleLevel } from '@/types/database';
+import Svg, { Path } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
+import { useProgressCalendar, DayData, CalendarMode } from '@/hooks/useProgressCalendar';
+import { useBiWeeklyStats } from '@/hooks/useBiWeeklyStats';
+import { Exercise } from '@/types/database';
+import ProgressHeader from '@/components/progress/ProgressHeader';
+import ProgressCalendar from '@/components/progress/ProgressCalendar';
+import DayDetailSheet from '@/components/progress/DayDetailSheet';
+import ExercisePickerModal from '@/components/progress/ExercisePickerModal';
 
-// All muscle groups we track (granular)
-const ALL_MUSCLE_GROUPS = [
-  'chest',
-  'upper back',
-  'lower back',
-  'shoulders',
-  'biceps',
-  'triceps',
-  'forearms',
-  'core',
-  'quads',
-  'hamstrings',
-  'glutes',
-  'calves',
-];
-
-// Display names for muscle groups
-const MUSCLE_DISPLAY_NAMES: Record<string, string> = {
-  'chest': 'Chest',
-  'upper back': 'Upper Back',
-  'lower back': 'Lower Back',
-  'shoulders': 'Shoulders',
-  'biceps': 'Biceps',
-  'triceps': 'Triceps',
-  'forearms': 'Forearms',
-  'core': 'Core',
-  'quads': 'Quadriceps',
-  'hamstrings': 'Hamstrings',
-  'glutes': 'Glutes',
-  'calves': 'Calves',
-};
+function DumbbellIcon({ size = 32 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M6.5 6.5L17.5 17.5" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M3 10L10 3" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M14 21L21 14" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 export default function ProgressScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile } = useAuthStore();
 
-  const [muscleLevels, setMuscleLevels] = useState<MuscleLevel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Calendar data hook
+  const {
+    monthsData,
+    fetchMonth,
+    mode,
+    setMode,
+    selectedExerciseId,
+    setSelectedExerciseId,
+    refresh: refreshCalendar,
+  } = useProgressCalendar();
+
+  // Bi-weekly stats hook
+  const {
+    streak,
+    workoutsCount,
+    biWeeklyWorkoutDays,
+    avgScore,
+    isLoading: statsLoading,
+    refresh: refreshStats,
+  } = useBiWeeklyStats();
+
+  // Local state
+  const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
+  const [daySheetVisible, setDaySheetVisible] = useState(false);
+  const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadMuscleLevels = async () => {
-    if (!profile?.id) return;
-
-    try {
-      const levels = await getUserMuscleLevels(profile.id);
-      setMuscleLevels(levels);
-    } catch (error) {
-      console.error('Error loading muscle levels:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Fetch initial month when mode or exercise changes
   useEffect(() => {
-    loadMuscleLevels();
-  }, [profile?.id]);
+    const now = new Date();
+    fetchMonth(now.getFullYear(), now.getMonth() + 1);
+  }, [mode, selectedExerciseId]);
 
-  const onRefresh = async () => {
+  const handleModeChange = useCallback((newMode: CalendarMode) => {
+    setMode(newMode);
+    if (newMode === 'score') {
+      setSelectedExercise(null);
+      setSelectedExerciseId(null);
+    }
+  }, [setMode, setSelectedExerciseId]);
+
+  const handleDayPress = useCallback((dayData: DayData) => {
+    setSelectedDay(dayData);
+    setDaySheetVisible(true);
+  }, []);
+
+  const handleExerciseSelect = useCallback((exercise: Exercise) => {
+    setSelectedExercise(exercise);
+    setSelectedExerciseId(exercise.id);
+  }, [setSelectedExerciseId]);
+
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadMuscleLevels();
+    await Promise.all([refreshCalendar(), refreshStats()]);
     setRefreshing(false);
+  }, [refreshCalendar, refreshStats]);
+
+  const handleStartWorkout = useCallback(() => {
+    router.push('/workout/new');
+  }, [router]);
+
+  // Check if we have any data
+  const hasData = monthsData.size > 0 && Array.from(monthsData.values()).some(m => m.days.size > 0);
+  const showEmptyState = !hasData && !statsLoading;
+
+  // Show different empty state based on mode
+  const renderEmptyState = () => {
+    if (mode === 'pr' && !selectedExerciseId) {
+      return (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconContainer}>
+            <DumbbellIcon />
+          </View>
+          <Text style={styles.emptyTitle}>Select an exercise</Text>
+          <Text style={styles.emptyDescription}>
+            Choose an exercise to view your PR history
+          </Text>
+          <TouchableOpacity
+            style={styles.emptyButton}
+            onPress={() => setExercisePickerVisible(true)}
+          >
+            <Text style={styles.emptyButtonText}>Select Exercise</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (mode === 'score' && showEmptyState) {
+      return (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconContainer}>
+            <DumbbellIcon />
+          </View>
+          <Text style={styles.emptyTitle}>No workouts yet</Text>
+          <Text style={styles.emptyDescription}>
+            Complete your first workout to track your progress
+          </Text>
+          <TouchableOpacity style={styles.emptyButton} onPress={handleStartWorkout}>
+            <Text style={styles.emptyButtonText}>Start Workout</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return null;
   };
 
-  // Create a complete list with all muscle groups, filling in zeros for missing ones
-  // Apply decay based on last_trained_at
-  const getMuscleData = (muscleGroup: string) => {
-    const found = muscleLevels.find(
-      m => m.muscle_group.toLowerCase() === muscleGroup.toLowerCase()
-    );
-
-    const storedLevel = found?.current_level || 0;
-    const storedXp = found?.current_xp || 0;
-    const lastTrainedAt = found?.last_trained_at || null;
-
-    // Calculate XP progress as percentage (0-1)
-    const xpNeeded = storedLevel >= MUSCLE_XP_CONFIG.MAX_LEVEL
-      ? 0
-      : xpForMuscleLevel(storedLevel + 1);
-    const storedProgress = xpNeeded > 0 ? storedXp / xpNeeded : 0;
-
-    // Apply decay
-    const decay = calculateMuscleDecay(storedLevel, storedProgress, lastTrainedAt);
-
-    return {
-      muscle_group: muscleGroup,
-      effectiveLevel: decay.effectiveLevel,
-      effectiveProgress: decay.effectiveProgress,
-      decayStatus: decay.decayStatus,
-      levelsLost: decay.levelsLost,
-      daysSinceTraining: decay.daysSinceTraining,
-      lastTrainedAt,
-    };
-  };
-
-  // Get all muscles sorted by effective level (highest first)
-  const sortedMuscles = ALL_MUSCLE_GROUPS
-    .map(getMuscleData)
-    .sort((a, b) => b.effectiveLevel - a.effectiveLevel || b.effectiveProgress - a.effectiveProgress);
-
-  // Calculate total level using effective (decayed) levels
-  const totalLevel = sortedMuscles.reduce((sum, m) => sum + m.effectiveLevel, 0);
+  // If in PR mode with no exercise selected, show empty state with scroll
+  const showCalendar = mode === 'score' || (mode === 'pr' && selectedExerciseId);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
-      refreshControl={
-        <RefreshControl
+    <View style={styles.container}>
+      {/* Sticky Header */}
+      <ProgressHeader
+        mode={mode}
+        onModeChange={handleModeChange}
+        selectedExerciseName={selectedExercise?.name ?? null}
+        onExercisePickerPress={() => setExercisePickerVisible(true)}
+        streak={streak}
+        workoutsCount={workoutsCount}
+        biWeeklyWorkoutDays={biWeeklyWorkoutDays}
+        avgScore={avgScore}
+        statsLoading={statsLoading}
+      />
+
+      {/* Calendar or Empty State */}
+      {showCalendar ? (
+        <ProgressCalendar
+          monthsData={monthsData}
+          fetchMonth={fetchMonth}
+          mode={mode}
+          onDayPress={handleDayPress}
+          onRefresh={handleRefresh}
           refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.accent}
         />
-      }
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>
-          Muscle Progress
-        </Text>
-        <View style={styles.totalLevel}>
-          <Text style={styles.totalLevelLabel}>
-            Total Level
-          </Text>
-          <Text style={styles.totalLevelValue}>{totalLevel}</Text>
-        </View>
-      </View>
-
-      {/* Muscle Cards */}
-      <View style={styles.muscleList}>
-        {sortedMuscles.map((muscle) => {
-          const isMaxLevel = muscle.effectiveLevel >= MUSCLE_XP_CONFIG.MAX_LEVEL;
-          const progress = isMaxLevel ? 100 : Math.min(100, muscle.effectiveProgress * 100);
-          const isDecaying = muscle.decayStatus === 'decaying' || muscle.decayStatus === 'resting';
-
-          return (
-            <View
-              key={muscle.muscle_group}
-              style={styles.muscleCard}
-            >
-              <View style={styles.muscleHeader}>
-                <View style={styles.muscleInfo}>
-                  <View>
-                    <Text style={styles.muscleName}>
-                      {MUSCLE_DISPLAY_NAMES[muscle.muscle_group] || muscle.muscle_group}
-                    </Text>
-                    {isDecaying && (
-                      <Text style={styles.decayHint}>
-                        {muscle.decayStatus === 'decaying'
-                          ? `Resting · ${muscle.levelsLost} level${muscle.levelsLost > 1 ? 's' : ''} to recover`
-                          : 'Resting'}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                <View style={[
-                  styles.levelBadge,
-                  isMaxLevel && styles.levelBadgeMax,
-                  isDecaying && !isMaxLevel && styles.levelBadgeResting,
-                ]}>
-                  <Text style={styles.levelText}>
-                    {isMaxLevel ? 'MAX' : `Lv.${muscle.effectiveLevel}`}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.progressContainer}>
-                <View style={styles.progressBg}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${progress}%` },
-                      muscle.effectiveLevel === 0 && progress === 0 && styles.progressEmpty,
-                      isMaxLevel && styles.progressFillMax,
-                      isDecaying && !isMaxLevel && styles.progressFillResting,
-                    ]}
-                  />
-                </View>
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* Empty State */}
-      {sortedMuscles.every(m => m.effectiveLevel === 0 && m.effectiveProgress === 0) && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>
-            Complete workouts to level up your muscles!
-          </Text>
-        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.accent}
+            />
+          }
+        >
+          {renderEmptyState()}
+        </ScrollView>
       )}
-    </ScrollView>
+
+      {/* Day Detail Sheet */}
+      <DayDetailSheet
+        visible={daySheetVisible}
+        onClose={() => setDaySheetVisible(false)}
+        dayData={selectedDay}
+        mode={mode}
+        exerciseName={selectedExercise?.name}
+      />
+
+      {/* Exercise Picker Modal */}
+      <ExercisePickerModal
+        visible={exercisePickerVisible}
+        onClose={() => setExercisePickerVisible(false)}
+        onSelectExercise={handleExerciseSelect}
+        selectedExerciseId={selectedExerciseId}
+      />
+    </View>
   );
 }
 
@@ -212,112 +203,50 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bgPrimary,
   },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
+  scrollView: {
+    flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  scrollContent: {
+    flexGrow: 1,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 40,
+    paddingVertical: 80,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
+  emptyIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.accent + '20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  totalLevel: {
-    alignItems: 'flex-end',
-  },
-  totalLevelLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+  emptyDescription: {
+    fontSize: 14,
     color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
   },
-  totalLevelValue: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: colors.accent,
-    fontVariant: ['tabular-nums'],
-  },
-  muscleList: {
-    gap: 12,
-  },
-  muscleCard: {
-    padding: 16,
+  emptyButton: {
+    backgroundColor: colors.accent,
+    paddingVertical: 14,
+    paddingHorizontal: 28,
     borderRadius: 12,
-    backgroundColor: colors.bgSecondary,
   },
-  muscleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  muscleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  muscleName: {
+  emptyButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.textPrimary,
-  },
-  decayHint: {
-    fontSize: 12,
-    marginTop: 2,
-    color: colors.textMuted,
-  },
-  levelBadge: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  levelBadgeMax: {
-    backgroundColor: colors.warning,
-  },
-  levelBadgeResting: {
-    backgroundColor: colors.textMuted,
-  },
-  levelText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  progressContainer: {
-    marginTop: 8,
-  },
-  progressBg: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    backgroundColor: colors.bgTertiary,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 4,
-  },
-  progressFillMax: {
-    backgroundColor: colors.warning,
-  },
-  progressFillResting: {
-    backgroundColor: colors.textMuted,
-  },
-  progressEmpty: {
-    backgroundColor: 'transparent',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-    color: colors.textSecondary,
   },
 });
