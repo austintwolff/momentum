@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
 import { useAuthStore } from '@/stores/auth.store';
-import { useSettingsStore, kgToLbs, WeightUnit } from '@/stores/settings.store';
+import { useSettingsStore, kgToLbs } from '@/stores/settings.store';
 import { useProteinStore } from '@/stores/protein.store';
 import { colors } from '@/constants/Colors';
 import Avatar from '@/components/profile/Avatar';
@@ -16,15 +16,6 @@ function UserEditIcon({ size = 20 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="8" r="4" stroke={colors.textMuted} strokeWidth={2} />
       <Path d="M20 21C20 16.5817 16.4183 13 12 13C7.58172 13 4 16.5817 4 21" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function BellIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -50,25 +41,11 @@ function LogoutIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-function ChevronIcon({ size = 24 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M9 18L15 12L9 6" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
 function ProteinIcon({ size = 20 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="9" stroke={colors.textSecondary} strokeWidth={2} />
-      <Path
-        d="M12 7V12L15 14"
-        stroke={colors.textSecondary}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <Path d="M12 7V12L15 14" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -76,13 +53,7 @@ function ProteinIcon({ size = 20 }: { size?: number }) {
 function CheckIcon({ size = 16 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Polyline
-        points="20 6 9 17 4 12"
-        stroke={colors.accent}
-        strokeWidth={3}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <Polyline points="20 6 9 17 4 12" stroke={colors.accent} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -90,12 +61,7 @@ function CheckIcon({ size = 16 }: { size?: number }) {
 function MinusIcon({ size = 16 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M5 12H19"
-        stroke={colors.textPrimary}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-      />
+      <Path d="M5 12H19" stroke={colors.textPrimary} strokeWidth={2.5} strokeLinecap="round" />
     </Svg>
   );
 }
@@ -115,7 +81,6 @@ export default function ProfileScreen() {
   const { weightUnit, setWeightUnit } = useSettingsStore();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
-  // Protein tracker state
   const {
     currentProtein,
     proteinGoal,
@@ -126,7 +91,6 @@ export default function ProfileScreen() {
     checkAndResetDaily,
   } = useProteinStore();
 
-  // Check for daily protein reset when screen loads
   useEffect(() => {
     checkAndResetDaily();
   }, []);
@@ -140,11 +104,7 @@ export default function ProfileScreen() {
       'Are you sure you want to sign out?',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: () => signOut(),
-        },
+        { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
       ]
     );
   };
@@ -156,171 +116,121 @@ export default function ProfileScreen() {
   const formatVolume = (volumeKg: number) => {
     const volume = weightUnit === 'lbs' ? kgToLbs(volumeKg) : volumeKg;
     if (volume >= 1000) {
-      return `${(volume / 1000).toFixed(1)}k ${weightUnit}`;
+      return `${(volume / 1000).toFixed(1)}k`;
     }
-    return `${Math.round(volume)} ${weightUnit}`;
+    return Math.round(volume).toString();
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 20 }]}
-    >
-      {/* Profile Header */}
-      <View style={styles.header}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+      {/* Header */}
+      <Text style={styles.title}>Profile</Text>
+
+      {/* Profile Card */}
+      <View style={styles.profileCard}>
         <Avatar
           uri={profile?.avatar_url}
           name={profile?.display_name || profile?.username}
-          size={80}
-          style={styles.avatar}
+          size={64}
         />
-        <Text style={styles.name}>
-          {profile?.display_name || profile?.username || 'User'}
-        </Text>
-        <Text style={styles.username}>
-          @{profile?.username || 'user'}
-        </Text>
+        <View style={styles.profileInfo}>
+          <Text style={styles.name} numberOfLines={1}>
+            {profile?.display_name || profile?.username || 'User'}
+          </Text>
+          <Text style={styles.username}>@{profile?.username || 'user'}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => setIsEditModalVisible(true)}
+          accessibilityLabel="Edit profile"
+        >
+          <UserEditIcon size={18} />
+        </TouchableOpacity>
       </View>
 
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            {userStats?.total_workouts || 0}
-          </Text>
+      {/* Stats Row */}
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{userStats?.total_workouts || 0}</Text>
           <Text style={styles.statLabel}>Workouts</Text>
         </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>
-            {formatVolume(userStats?.total_volume_kg || 0)}
-          </Text>
-          <Text style={styles.statLabel}>Total Volume</Text>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{formatVolume(userStats?.total_volume_kg || 0)}</Text>
+          <Text style={styles.statLabel}>Volume ({weightUnit})</Text>
         </View>
       </View>
 
       {/* Protein Tracker */}
-      <View style={styles.proteinSection}>
+      <View style={styles.proteinCard}>
         <View style={styles.proteinHeader}>
           <View style={styles.proteinTitleRow}>
-            <ProteinIcon size={18} />
-            <Text style={styles.proteinTitle}>Protein Tracker</Text>
+            <ProteinIcon size={16} />
+            <Text style={styles.proteinTitle}>Protein</Text>
           </View>
           <View style={styles.proteinValueRow}>
-            {goalReached && <CheckIcon size={16} />}
+            {goalReached && <CheckIcon size={14} />}
             <Text style={[styles.proteinValue, goalReached && styles.proteinValueComplete]}>
-              {currentProtein} / {proteinGoal}g
+              {currentProtein}/{proteinGoal}g
             </Text>
           </View>
         </View>
 
-        {/* Progress Bar */}
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarBackground}>
-            <View
-              style={[
-                styles.progressBarFill,
-                { width: `${proteinProgress * 100}%` },
-              ]}
-            />
-          </View>
-          <View style={[styles.progressBarKnob, goalReached && styles.progressBarKnobComplete]} />
+        <View style={styles.progressBarBg}>
+          <View style={[styles.progressBarFill, { width: `${proteinProgress * 100}%` }]} />
         </View>
 
-        {/* Increment Controls */}
-        <View style={styles.proteinButtons}>
-          {/* Minus Button */}
+        <View style={styles.proteinControls}>
           <TouchableOpacity
-            style={[styles.proteinActionButton, currentProtein === 0 && styles.proteinButtonDisabled]}
+            style={[styles.controlButton, currentProtein === 0 && styles.controlButtonDisabled]}
             onPress={subtractProtein}
             disabled={currentProtein === 0}
             accessibilityLabel="Subtract protein"
           >
-            <MinusIcon size={18} />
+            <MinusIcon size={16} />
           </TouchableOpacity>
 
-          {/* Increment Selection Buttons */}
           {([5, 10, 25] as const).map((amount) => (
             <TouchableOpacity
               key={amount}
-              style={[
-                styles.proteinIncrementButton,
-                selectedIncrement === amount && styles.proteinIncrementButtonSelected,
-              ]}
+              style={[styles.incrementButton, selectedIncrement === amount && styles.incrementButtonActive]}
               onPress={() => setSelectedIncrement(amount)}
               accessibilityLabel={`Select ${amount} gram increment`}
             >
-              <Text
-                style={[
-                  styles.proteinButtonText,
-                  selectedIncrement === amount && styles.proteinButtonTextSelected,
-                ]}
-              >
+              <Text style={[styles.incrementText, selectedIncrement === amount && styles.incrementTextActive]}>
                 {amount}g
               </Text>
             </TouchableOpacity>
           ))}
 
-          {/* Plus Button */}
           <TouchableOpacity
-            style={styles.proteinActionButton}
+            style={styles.controlButton}
             onPress={addProtein}
             accessibilityLabel="Add protein"
           >
-            <PlusIcon size={18} />
+            <PlusIcon size={16} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Settings Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Settings
-        </Text>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => setIsEditModalVisible(true)}>
-          <UserEditIcon />
-          <Text style={styles.menuText}>
-            Edit Profile
-          </Text>
-          <ChevronIcon />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <BellIcon />
-          <Text style={styles.menuText}>
-            Notifications
-          </Text>
-          <ChevronIcon />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={toggleWeightUnit}
-        >
-          <ScaleIcon />
-          <Text style={styles.menuText}>
-            Weight Unit
-          </Text>
+      {/* Settings */}
+      <View style={styles.settingsSection}>
+        <TouchableOpacity style={styles.settingRow} onPress={toggleWeightUnit}>
+          <ScaleIcon size={18} />
+          <Text style={styles.settingLabel}>Weight Unit</Text>
           <View style={styles.unitToggle}>
-            <Text style={[
-              styles.unitOption,
-              weightUnit === 'lbs' && styles.unitOptionActive,
-            ]}>
-              lbs
-            </Text>
-            <Text style={[
-              styles.unitOption,
-              weightUnit === 'kg' && styles.unitOptionActive,
-            ]}>
-              kg
-            </Text>
+            <Text style={[styles.unitOption, weightUnit === 'lbs' && styles.unitOptionActive]}>lbs</Text>
+            <Text style={[styles.unitOption, weightUnit === 'kg' && styles.unitOptionActive]}>kg</Text>
           </View>
         </TouchableOpacity>
       </View>
 
+      {/* Spacer */}
+      <View style={styles.spacer} />
+
       {/* Sign Out */}
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <LogoutIcon />
+        <LogoutIcon size={18} />
         <Text style={styles.signOutText}>Sign Out</Text>
       </TouchableOpacity>
 
@@ -335,7 +245,7 @@ export default function ProfileScreen() {
         currentName={profile?.display_name}
         currentAvatarUrl={profile?.avatar_url}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -343,57 +253,82 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgPrimary,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 20,
   },
-  header: {
+
+  // Profile Card
+  profileCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    gap: 14,
   },
-  avatar: {
-    marginBottom: 12,
+  profileInfo: {
+    flex: 1,
   },
   name: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   username: {
-    fontSize: 16,
-    marginTop: 4,
+    fontSize: 14,
     color: colors.textSecondary,
+    marginTop: 2,
   },
-  statsGrid: {
+  editButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.bgTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Stats Row
+  statsRow: {
     flexDirection: 'row',
-    gap: 12,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    paddingVertical: 16,
     marginBottom: 16,
   },
-  statCard: {
+  statItem: {
     flex: 1,
-    padding: 16,
-    borderRadius: 16,
     alignItems: 'center',
-    backgroundColor: colors.bgSecondary,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
   statLabel: {
     fontSize: 12,
-    marginTop: 4,
     color: colors.textSecondary,
+    marginTop: 2,
   },
-  // Protein Tracker
-  proteinSection: {
+  statDivider: {
+    width: 1,
+    backgroundColor: colors.border,
+  },
+
+  // Protein Card
+  proteinCard: {
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
     padding: 14,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   proteinHeader: {
     flexDirection: 'row',
@@ -404,7 +339,7 @@ const styles = StyleSheet.create({
   proteinTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   proteinTitle: {
     fontSize: 15,
@@ -414,117 +349,91 @@ const styles = StyleSheet.create({
   proteinValueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   proteinValue: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
-    color: colors.textPrimary,
+    color: colors.textSecondary,
   },
   proteinValueComplete: {
     color: colors.accent,
   },
-  progressBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressBarBackground: {
-    flex: 1,
-    height: 8,
+  progressBarBg: {
+    height: 6,
     backgroundColor: colors.bgTertiary,
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
+    marginBottom: 12,
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: colors.accent,
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  progressBarKnob: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.accent,
-    marginLeft: -8,
-    borderWidth: 2,
-    borderColor: colors.bgSecondary,
-  },
-  progressBarKnobComplete: {
-    backgroundColor: colors.accent,
-  },
-  proteinButtons: {
+  proteinControls: {
     flexDirection: 'row',
     gap: 8,
   },
-  proteinActionButton: {
-    width: 44,
-    paddingVertical: 8,
+  controlButton: {
+    width: 40,
+    height: 36,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  proteinIncrementButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  proteinIncrementButtonSelected: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  proteinButtonDisabled: {
+  controlButtonDisabled: {
     opacity: 0.4,
   },
-  proteinButtonText: {
-    fontSize: 14,
+  incrementButton: {
+    flex: 1,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors.bgTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  incrementButtonActive: {
+    backgroundColor: colors.accent,
+  },
+  incrementText: {
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  proteinButtonTextSelected: {
-    color: colors.textPrimary,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-    textTransform: 'uppercase',
     color: colors.textSecondary,
   },
-  menuItem: {
+  incrementTextActive: {
+    color: colors.textPrimary,
+  },
+
+  // Settings
+  settingsSection: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    padding: 14,
     gap: 12,
-    backgroundColor: colors.bgSecondary,
   },
-  menuText: {
+  settingLabel: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textPrimary,
   },
   unitToggle: {
     flexDirection: 'row',
     backgroundColor: colors.bgTertiary,
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: 'hidden',
   },
   unitOption: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    fontSize: 14,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textMuted,
   },
@@ -532,21 +441,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     color: colors.textPrimary,
   },
+
+  // Spacer
+  spacer: {
+    flex: 1,
+  },
+
+  // Sign Out
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: colors.error + '1A',
+    backgroundColor: colors.error + '15',
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 12,
   },
   signOutText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.error,
   },
+
+  // Version
   version: {
     textAlign: 'center',
     fontSize: 12,
