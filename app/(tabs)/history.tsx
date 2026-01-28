@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useAuthStore } from '@/stores/auth.store';
+import { useSettingsStore, kgToLbs } from '@/stores/settings.store';
 import { getWorkoutHistory } from '@/services/workout.service';
 import { colors } from '@/constants/Colors';
 
@@ -72,6 +73,7 @@ export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
+  const { weightUnit } = useSettingsStore();
 
   const [workouts, setWorkouts] = useState<WorkoutItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,10 +138,11 @@ export default function HistoryScreen() {
 
   const formatVolume = (volumeKg: number | null) => {
     if (!volumeKg) return '0';
-    if (volumeKg >= 1000) {
-      return `${(volumeKg / 1000).toFixed(1)}k`;
+    const volume = weightUnit === 'lbs' ? kgToLbs(volumeKg) : volumeKg;
+    if (volume >= 1000) {
+      return `${(volume / 1000).toFixed(1)}k`;
     }
-    return Math.round(volumeKg).toString();
+    return Math.round(volume).toString();
   };
 
   const renderWorkout = ({ item }: { item: WorkoutItem }) => (
@@ -187,7 +190,7 @@ export default function HistoryScreen() {
         <View style={styles.stat}>
           <DumbbellIcon />
           <Text style={styles.statText}>
-            {formatVolume(item.total_volume_kg)} kg
+            {formatVolume(item.total_volume_kg)} {weightUnit}
           </Text>
         </View>
       </View>
