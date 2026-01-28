@@ -7,11 +7,14 @@ import { CalendarMode, DayData, WorkoutSummary, SetData } from '@/hooks/useProgr
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const SHEET_WIDTH = Math.min(SCREEN_WIDTH - 40, 360);
 
+const KG_TO_LBS = 2.20462;
+
 interface DayDetailSheetProps {
   visible: boolean;
   onClose: () => void;
   dayData: DayData | null;
   mode: CalendarMode;
+  weightUnit: 'kg' | 'lbs';
   exerciseName?: string;
 }
 
@@ -99,6 +102,7 @@ export default function DayDetailSheet({
   onClose,
   dayData,
   mode,
+  weightUnit,
   exerciseName,
 }: DayDetailSheetProps) {
   const router = useRouter();
@@ -163,13 +167,15 @@ export default function DayDetailSheet({
                   {/* Best E1RM */}
                   <View style={styles.prSection}>
                     <Text style={styles.prLabel}>Best E1RM</Text>
-                    <Text style={styles.prValue}>{Math.round(dayData.bestSet.e1rm)} kg</Text>
+                    <Text style={styles.prValue}>
+                      {Math.round(weightUnit === 'lbs' ? dayData.bestSet.e1rm * KG_TO_LBS : dayData.bestSet.e1rm)} {weightUnit}
+                    </Text>
                   </View>
 
                   {/* Set Details */}
                   <View style={styles.setDetails}>
                     <Text style={styles.setDetailsText}>
-                      {dayData.bestSet.weight_kg} kg × {dayData.bestSet.reps} reps
+                      {Math.round(weightUnit === 'lbs' ? dayData.bestSet.weight_kg * KG_TO_LBS : dayData.bestSet.weight_kg)} {weightUnit} × {dayData.bestSet.reps} reps
                     </Text>
                   </View>
 

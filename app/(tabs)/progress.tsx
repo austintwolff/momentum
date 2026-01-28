@@ -6,6 +6,7 @@ import Svg, { Path } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
 import { useProgressCalendar, DayData, CalendarMode } from '@/hooks/useProgressCalendar';
 import { useBiWeeklyStats } from '@/hooks/useBiWeeklyStats';
+import { useSettingsStore } from '@/stores/settings.store';
 import { Exercise } from '@/types/database';
 import ProgressHeader from '@/components/progress/ProgressHeader';
 import ProgressCalendar from '@/components/progress/ProgressCalendar';
@@ -25,6 +26,7 @@ function DumbbellIcon({ size = 32 }: { size?: number }) {
 export default function ProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { weightUnit } = useSettingsStore();
 
   // Calendar data hook
   const {
@@ -158,6 +160,7 @@ export default function ProgressScreen() {
           monthsData={monthsData}
           fetchMonth={fetchMonth}
           mode={mode}
+          weightUnit={weightUnit}
           onDayPress={handleDayPress}
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -184,6 +187,7 @@ export default function ProgressScreen() {
         onClose={() => setDaySheetVisible(false)}
         dayData={selectedDay}
         mode={mode}
+        weightUnit={weightUnit}
         exerciseName={selectedExercise?.name}
       />
 

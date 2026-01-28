@@ -8,6 +8,7 @@ interface CalendarMonthProps {
   month: number; // 1-12
   data: MonthData | undefined;
   mode: CalendarMode;
+  weightUnit: 'kg' | 'lbs';
   onDayPress: (dayData: DayData) => void;
 }
 
@@ -37,6 +38,7 @@ export default function CalendarMonth({
   month,
   data,
   mode,
+  weightUnit,
   onDayPress,
 }: CalendarMonthProps) {
   const today = new Date();
@@ -118,6 +120,7 @@ export default function CalendarMonth({
                   value={dayData?.value ?? null}
                   isToday={day === todayDate}
                   mode={mode}
+                  weightUnit={weightUnit}
                   onPress={() => day && handleDayPress(day)}
                 />
               );

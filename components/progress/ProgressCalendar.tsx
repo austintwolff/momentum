@@ -14,6 +14,7 @@ interface ProgressCalendarProps {
   monthsData: Map<string, MonthData>;
   fetchMonth: (year: number, month: number) => Promise<void>;
   mode: CalendarMode;
+  weightUnit: 'kg' | 'lbs';
   onDayPress: (dayData: DayData) => void;
   onRefresh?: () => Promise<void>;
   refreshing?: boolean;
@@ -50,6 +51,7 @@ export default function ProgressCalendar({
   monthsData,
   fetchMonth,
   mode,
+  weightUnit,
   onDayPress,
   onRefresh,
   refreshing = false,
@@ -129,10 +131,11 @@ export default function ProgressCalendar({
         month={item.month}
         data={data}
         mode={mode}
+        weightUnit={weightUnit}
         onDayPress={onDayPress}
       />
     );
-  }, [monthsData, mode, onDayPress]);
+  }, [monthsData, mode, weightUnit, onDayPress]);
 
   const getItemLayout = useCallback((_: any, index: number) => ({
     length: 340, // Approximate height of a month

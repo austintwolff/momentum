@@ -4,11 +4,14 @@ import { CalendarMode } from '@/hooks/useProgressCalendar';
 
 interface CalendarDayCellProps {
   day: number | null; // null for empty cells
-  value: number | null; // score (0-100) or E1RM
+  value: number | null; // score (0-100) or E1RM in kg
   isToday: boolean;
   mode: CalendarMode;
+  weightUnit: 'kg' | 'lbs';
   onPress?: () => void;
 }
+
+const KG_TO_LBS = 2.20462;
 
 /**
  * Get background opacity based on score (0-100)
@@ -36,6 +39,7 @@ export default function CalendarDayCell({
   value,
   isToday,
   mode,
+  weightUnit,
   onPress,
 }: CalendarDayCellProps) {
   // Empty cell
@@ -54,11 +58,11 @@ export default function CalendarDayCell({
     ? `rgba(124, 58, 237, ${opacity})` // accent color with opacity
     : 'transparent';
 
-  // Format value for display
+  // Format value for display (convert E1RM from kg to lbs if needed)
   const displayValue = hasData
     ? mode === 'score'
       ? Math.round(value).toString()
-      : `${Math.round(value)}`
+      : `${Math.round(weightUnit === 'lbs' ? value * KG_TO_LBS : value)}`
     : null;
 
   return (
