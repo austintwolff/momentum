@@ -46,6 +46,16 @@ function CameraIcon({ size = 24 }: { size?: number }) {
   );
 }
 
+function LogoutIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M16 17L21 12L16 7" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M21 12H9" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 type Sex = 'male' | 'female';
 
 interface EditProfileModalProps {
@@ -53,6 +63,7 @@ interface EditProfileModalProps {
   onClose: () => void;
   onSave: (displayName: string, avatarUri?: string | null) => Promise<void>;
   onSexChange: (sex: Sex) => void;
+  onSignOut: () => void;
   currentName?: string | null;
   currentAvatarUrl?: string | null;
   currentSex: Sex;
@@ -63,6 +74,7 @@ export default function EditProfileModal({
   onClose,
   onSave,
   onSexChange,
+  onSignOut,
   currentName,
   currentAvatarUrl,
   currentSex,
@@ -204,6 +216,12 @@ export default function EditProfileModal({
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Sign Out */}
+            <TouchableOpacity style={styles.signOutButton} onPress={onSignOut}>
+              <LogoutIcon size={18} />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -322,5 +340,21 @@ const styles = StyleSheet.create({
   },
   sexOptionTextActive: {
     color: colors.textPrimary,
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.error + '15',
+    gap: 8,
+    marginTop: 40,
+  },
+  signOutText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.error,
   },
 });

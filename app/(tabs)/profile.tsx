@@ -50,16 +50,6 @@ function ScaleIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-function LogoutIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M16 17L21 12L16 7" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M21 12H9" stroke={colors.error} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
 function CheckIcon({ size = 16 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -356,12 +346,6 @@ export default function ProfileScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* Sign Out */}
-      <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-        <LogoutIcon size={18} />
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-
       {/* Version */}
       <Text style={styles.version}>Momentum v1.0.0</Text>
 
@@ -371,6 +355,7 @@ export default function ProfileScreen() {
         onClose={() => setIsEditModalVisible(false)}
         onSave={updateProfile}
         onSexChange={(newSex) => updateMeasurements({ sex: newSex })}
+        onSignOut={handleSignOut}
         currentName={profile?.display_name}
         currentAvatarUrl={profile?.avatar_url}
         currentSex={sex}
@@ -399,7 +384,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: 10,
+    marginBottom: 12,
   },
 
   // Profile Card
@@ -408,9 +393,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    gap: 10,
+    padding: 14,
+    marginBottom: 16,
+    gap: 12,
   },
   profileInfo: {
     flex: 1,
@@ -439,14 +424,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
     textTransform: 'uppercase',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   sectionEditButton: {
     width: 26,
@@ -455,29 +440,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
 
   // Stats Row
   statsRow: {
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 16,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -490,21 +475,21 @@ const styles = StyleSheet.create({
   measurementsCard: {
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 16,
   },
   measurementItem: {
     flex: 1,
     alignItems: 'center',
   },
   measurementLabel: {
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textSecondary,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   measurementValue: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
@@ -517,18 +502,18 @@ const styles = StyleSheet.create({
   // Tracker Card (shared by protein & calories)
   trackerCard: {
     backgroundColor: colors.bgSecondary,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 8,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
   },
   trackerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   trackerLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
   },
@@ -538,7 +523,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   trackerValue: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     color: colors.textSecondary,
@@ -547,24 +532,24 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   progressBarBg: {
-    height: 4,
+    height: 5,
     backgroundColor: colors.bgTertiary,
-    borderRadius: 2,
+    borderRadius: 2.5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: colors.accent,
-    borderRadius: 2,
+    borderRadius: 2.5,
   },
   trackerControls: {
     flexDirection: 'row',
-    gap: 5,
+    gap: 6,
   },
   controlButton: {
-    width: 34,
-    height: 30,
+    width: 36,
+    height: 32,
     borderRadius: 6,
     backgroundColor: colors.bgTertiary,
     alignItems: 'center',
@@ -575,7 +560,7 @@ const styles = StyleSheet.create({
   },
   incrementButton: {
     flex: 1,
-    height: 30,
+    height: 32,
     borderRadius: 6,
     backgroundColor: colors.bgTertiary,
     alignItems: 'center',
@@ -585,7 +570,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   incrementText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
   },
@@ -598,14 +583,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-    gap: 8,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 10,
   },
   settingLabel: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     color: colors.textPrimary,
   },
   unitToggle: {
@@ -615,9 +600,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   unitOption: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    fontSize: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textMuted,
   },
@@ -626,27 +611,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Sign Out
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.error + '15',
-    gap: 6,
-    marginBottom: 8,
-  },
-  signOutText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.error,
-  },
-
   // Version
   version: {
     textAlign: 'center',
-    fontSize: 10,
+    fontSize: 11,
     color: colors.textMuted,
   },
 });
