@@ -6,6 +6,7 @@ import { showAlert } from '@/lib/alert';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore, kgToLbs } from '@/stores/settings.store';
 import { useProteinStore } from '@/stores/protein.store';
+import { useCalorieStore } from '@/stores/calorie.store';
 import { colors } from '@/constants/Colors';
 import Avatar from '@/components/profile/Avatar';
 import EditProfileModal from '@/components/profile/EditProfileModal';
@@ -41,15 +42,6 @@ function LogoutIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-function ProteinIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Circle cx="12" cy="12" r="9" stroke={colors.textSecondary} strokeWidth={2} />
-      <Path d="M12 7V12L15 14" stroke={colors.textSecondary} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
 function CheckIcon({ size = 16 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -75,28 +67,116 @@ function PlusIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+// Reusable Macro Tracker Component
+interface MacroTrackerProps<T extends number> {
+  label: string;
+  current: number;
+  goal: number;
+  unit: string;
+  increments: readonly T[];
+  selectedIncrement: T;
+  onAdd: () => void;
+  onSubtract: () => void;
+  onIncrementChange: (increment: T) => void;
+}
+
+function MacroTracker<T extends number>({
+  label,
+  current,
+  goal,
+  unit,
+  increments,
+  selectedIncrement,
+  onAdd,
+  onSubtract,
+  onIncrementChange,
+}: MacroTrackerProps<T>) {
+  const progress = Math.min(current / goal, 1);
+  const goalReached = current >= goal;
+
+  return (
+    <View style={styles.trackerCard}>
+      <View style={styles.trackerHeader}>
+        <Text style={styles.trackerLabel}>{label}</Text>
+        <View style={styles.trackerValueRow}>
+          {goalReached && <CheckIcon size={14} />}
+          <Text style={[styles.trackerValue, goalReached && styles.trackerValueComplete]}>
+            {current.toLocaleString()}/{goal.toLocaleString()}{unit}
+          </Text>
+        </View>
+      </View>
+
+      <View style={styles.progressBarBg}>
+        <View style={[styles.progressBarFill, { width: `${progress * 100}%` }]} />
+      </View>
+
+      <View style={styles.trackerControls}>
+        <TouchableOpacity
+          style={[styles.controlButton, current === 0 && styles.controlButtonDisabled]}
+          onPress={onSubtract}
+          disabled={current === 0}
+          accessibilityLabel={`Subtract ${label.toLowerCase()}`}
+        >
+          <MinusIcon size={16} />
+        </TouchableOpacity>
+
+        {increments.map((amount) => (
+          <TouchableOpacity
+            key={amount}
+            style={[styles.incrementButton, selectedIncrement === amount && styles.incrementButtonActive]}
+            onPress={() => onIncrementChange(amount)}
+            accessibilityLabel={`Select ${amount} ${unit} increment`}
+          >
+            <Text style={[styles.incrementText, selectedIncrement === amount && styles.incrementTextActive]}>
+              {amount}{unit}
+            </Text>
+          </TouchableOpacity>
+        ))}
+
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={onAdd}
+          accessibilityLabel={`Add ${label.toLowerCase()}`}
+        >
+          <PlusIcon size={16} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, userStats, signOut, updateProfile } = useAuthStore();
   const { weightUnit, setWeightUnit } = useSettingsStore();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
+  // Protein store
   const {
     currentProtein,
     proteinGoal,
-    selectedIncrement,
+    selectedIncrement: proteinIncrement,
     addProtein,
     subtractProtein,
-    setSelectedIncrement,
-    checkAndResetDaily,
+    setSelectedIncrement: setProteinIncrement,
+    checkAndResetDaily: checkProteinReset,
   } = useProteinStore();
 
-  useEffect(() => {
-    checkAndResetDaily();
-  }, []);
+  // Calorie store
+  const {
+    currentCalories,
+    calorieGoal,
+    selectedIncrement: calorieIncrement,
+    addCalories,
+    subtractCalories,
+    setSelectedIncrement: setCalorieIncrement,
+    checkAndResetDaily: checkCalorieReset,
+  } = useCalorieStore();
 
-  const proteinProgress = Math.min(currentProtein / proteinGoal, 1);
-  const goalReached = currentProtein >= proteinGoal;
+  useEffect(() => {
+    checkProteinReset();
+    checkCalorieReset();
+  }, []);
 
   const handleSignOut = () => {
     showAlert(
@@ -131,7 +211,7 @@ export default function ProfileScreen() {
         <Avatar
           uri={profile?.avatar_url}
           name={profile?.display_name || profile?.username}
-          size={64}
+          size={56}
         />
         <View style={styles.profileInfo}>
           <Text style={styles.name} numberOfLines={1}>
@@ -161,69 +241,42 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Protein Tracker */}
-      <View style={styles.proteinCard}>
-        <View style={styles.proteinHeader}>
-          <View style={styles.proteinTitleRow}>
-            <ProteinIcon size={16} />
-            <Text style={styles.proteinTitle}>Protein</Text>
-          </View>
-          <View style={styles.proteinValueRow}>
-            {goalReached && <CheckIcon size={14} />}
-            <Text style={[styles.proteinValue, goalReached && styles.proteinValueComplete]}>
-              {currentProtein}/{proteinGoal}g
-            </Text>
-          </View>
+      {/* Weight Unit Setting */}
+      <TouchableOpacity style={styles.settingRow} onPress={toggleWeightUnit}>
+        <ScaleIcon size={18} />
+        <Text style={styles.settingLabel}>Weight Unit</Text>
+        <View style={styles.unitToggle}>
+          <Text style={[styles.unitOption, weightUnit === 'lbs' && styles.unitOptionActive]}>lbs</Text>
+          <Text style={[styles.unitOption, weightUnit === 'kg' && styles.unitOptionActive]}>kg</Text>
         </View>
+      </TouchableOpacity>
 
-        <View style={styles.progressBarBg}>
-          <View style={[styles.progressBarFill, { width: `${proteinProgress * 100}%` }]} />
-        </View>
+      {/* Macro Tracking Section */}
+      <Text style={styles.sectionTitle}>Macro Tracking</Text>
 
-        <View style={styles.proteinControls}>
-          <TouchableOpacity
-            style={[styles.controlButton, currentProtein === 0 && styles.controlButtonDisabled]}
-            onPress={subtractProtein}
-            disabled={currentProtein === 0}
-            accessibilityLabel="Subtract protein"
-          >
-            <MinusIcon size={16} />
-          </TouchableOpacity>
+      <MacroTracker
+        label="Protein"
+        current={currentProtein}
+        goal={proteinGoal}
+        unit="g"
+        increments={[5, 10, 25] as const}
+        selectedIncrement={proteinIncrement}
+        onAdd={addProtein}
+        onSubtract={subtractProtein}
+        onIncrementChange={setProteinIncrement}
+      />
 
-          {([5, 10, 25] as const).map((amount) => (
-            <TouchableOpacity
-              key={amount}
-              style={[styles.incrementButton, selectedIncrement === amount && styles.incrementButtonActive]}
-              onPress={() => setSelectedIncrement(amount)}
-              accessibilityLabel={`Select ${amount} gram increment`}
-            >
-              <Text style={[styles.incrementText, selectedIncrement === amount && styles.incrementTextActive]}>
-                {amount}g
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={addProtein}
-            accessibilityLabel="Add protein"
-          >
-            <PlusIcon size={16} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Settings */}
-      <View style={styles.settingsSection}>
-        <TouchableOpacity style={styles.settingRow} onPress={toggleWeightUnit}>
-          <ScaleIcon size={18} />
-          <Text style={styles.settingLabel}>Weight Unit</Text>
-          <View style={styles.unitToggle}>
-            <Text style={[styles.unitOption, weightUnit === 'lbs' && styles.unitOptionActive]}>lbs</Text>
-            <Text style={[styles.unitOption, weightUnit === 'kg' && styles.unitOptionActive]}>kg</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+      <MacroTracker
+        label="Calories"
+        current={currentCalories}
+        goal={calorieGoal}
+        unit=""
+        increments={[50, 100, 250] as const}
+        selectedIncrement={calorieIncrement}
+        onAdd={addCalories}
+        onSubtract={subtractCalories}
+        onIncrementChange={setCalorieIncrement}
+      />
 
       {/* Spacer */}
       <View style={styles.spacer} />
@@ -260,7 +313,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: 20,
+    marginBottom: 16,
   },
 
   // Profile Card
@@ -268,28 +321,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    gap: 14,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+    gap: 12,
   },
   profileInfo: {
     flex: 1,
   },
   name: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   username: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     marginTop: 2,
   },
   editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -300,21 +353,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
-    paddingVertical: 16,
-    marginBottom: 16,
+    paddingVertical: 14,
+    marginBottom: 12,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -323,101 +376,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
 
-  // Protein Card
-  proteinCard: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-  },
-  proteinHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  proteinTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  proteinTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  proteinValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  proteinValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-    color: colors.textSecondary,
-  },
-  proteinValueComplete: {
-    color: colors.accent,
-  },
-  progressBarBg: {
-    height: 6,
-    backgroundColor: colors.bgTertiary,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 3,
-  },
-  proteinControls: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  controlButton: {
-    width: 40,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: colors.bgTertiary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  controlButtonDisabled: {
-    opacity: 0.4,
-  },
-  incrementButton: {
-    flex: 1,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: colors.bgTertiary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  incrementButtonActive: {
-    backgroundColor: colors.accent,
-  },
-  incrementText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  incrementTextActive: {
-    color: colors.textPrimary,
-  },
-
-  // Settings
-  settingsSection: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
+  // Setting Row
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 12,
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    gap: 10,
   },
   settingLabel: {
     flex: 1,
@@ -442,6 +409,94 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
+  // Section Title
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+
+  // Tracker Card (shared by protein & calories)
+  trackerCard: {
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  trackerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  trackerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  trackerValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trackerValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    color: colors.textSecondary,
+  },
+  trackerValueComplete: {
+    color: colors.accent,
+  },
+  progressBarBg: {
+    height: 5,
+    backgroundColor: colors.bgTertiary,
+    borderRadius: 2.5,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 2.5,
+  },
+  trackerControls: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  controlButton: {
+    width: 36,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: colors.bgTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlButtonDisabled: {
+    opacity: 0.4,
+  },
+  incrementButton: {
+    flex: 1,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: colors.bgTertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  incrementButtonActive: {
+    backgroundColor: colors.accent,
+  },
+  incrementText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  incrementTextActive: {
+    color: colors.textPrimary,
+  },
+
   // Spacer
   spacer: {
     flex: 1,
@@ -452,14 +507,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
     backgroundColor: colors.error + '15',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   signOutText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.error,
   },
@@ -467,7 +522,7 @@ const styles = StyleSheet.create({
   // Version
   version: {
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textMuted,
   },
 });
