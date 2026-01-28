@@ -292,19 +292,19 @@ export default function ProfileScreen() {
           <EditIcon size={14} />
         </TouchableOpacity>
       </View>
-      <View style={styles.measurementsCard}>
-        <View style={styles.measurementItem}>
-          <Text style={styles.measurementLabel}>Height</Text>
-          <Text style={styles.measurementValue}>
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>
             {formatHeight(heightCm, useMetric)}
           </Text>
+          <Text style={styles.statLabel}>Height</Text>
         </View>
-        <View style={styles.measurementDivider} />
-        <View style={styles.measurementItem}>
-          <Text style={styles.measurementLabel}>Weight</Text>
-          <Text style={styles.measurementValue}>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>
             {formatMeasurementWeight(weightKg, useMetric)}
           </Text>
+          <Text style={styles.statLabel}>Weight</Text>
         </View>
       </View>
 
@@ -467,34 +467,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   statDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-  },
-
-  // Measurements Card
-  measurementsCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginBottom: 16,
-  },
-  measurementItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  measurementLabel: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginBottom: 3,
-  },
-  measurementValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-    color: colors.textPrimary,
-  },
-  measurementDivider: {
     width: 1,
     backgroundColor: colors.border,
   },
