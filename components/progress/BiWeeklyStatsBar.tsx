@@ -65,9 +65,16 @@ export default function BiWeeklyStatsBar({
           <View style={styles.workoutsRow}>
             <Text style={styles.statValueLarge}>{workoutsCount}</Text>
             <View style={styles.dotsContainer}>
-              {biWeeklyWorkoutDays.map((active, index) => (
-                <DayDot key={index} active={active} />
-              ))}
+              <View style={styles.dotsRow}>
+                {biWeeklyWorkoutDays.slice(0, 7).map((active, index) => (
+                  <DayDot key={index} active={active} />
+                ))}
+              </View>
+              <View style={styles.dotsRow}>
+                {biWeeklyWorkoutDays.slice(7, 14).map((active, index) => (
+                  <DayDot key={index + 7} active={active} />
+                ))}
+              </View>
             </View>
           </View>
         </View>
@@ -138,10 +145,11 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dotsContainer: {
+    gap: 3,
+  },
+  dotsRow: {
     flexDirection: 'row',
-    gap: 2,
-    flexWrap: 'wrap',
-    maxWidth: 60,
+    gap: 3,
   },
   dayDot: {
     width: 5,
