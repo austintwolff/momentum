@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
@@ -7,9 +7,18 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore, kgToLbs } from '@/stores/settings.store';
 import { useProteinStore } from '@/stores/protein.store';
 import { useCalorieStore } from '@/stores/calorie.store';
+import {
+  useMeasurementsStore,
+  calculateProteinGoal,
+  calculateCalorieGoal,
+  formatHeight,
+  formatWeight as formatMeasurementWeight,
+} from '@/stores/measurements.store';
+import { useTotalSets } from '@/hooks/useTotalSets';
 import { colors } from '@/constants/Colors';
 import Avatar from '@/components/profile/Avatar';
 import EditProfileModal from '@/components/profile/EditProfileModal';
+import EditMeasurementsModal from '@/components/profile/EditMeasurementsModal';
 
 // Custom SVG Icons
 function UserEditIcon({ size = 20 }: { size?: number }) {
@@ -17,6 +26,15 @@ function UserEditIcon({ size = 20 }: { size?: number }) {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="8" r="4" stroke={colors.textMuted} strokeWidth={2} />
       <Path d="M20 21C20 16.5817 16.4183 13 12 13C7.58172 13 4 16.5817 4 21" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+function EditIcon({ size = 16 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M18.5 2.50001C18.8978 2.10219 19.4374 1.87869 20 1.87869C20.5626 1.87869 21.1022 2.10219 21.5 2.50001C21.8978 2.89784 22.1213 3.4374 22.1213 4.00001C22.1213 4.56262 21.8978 5.10219 21.5 5.50001L12 15L8 16L9 12L18.5 2.50001Z" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -150,33 +168,53 @@ export default function ProfileScreen() {
   const { profile, userStats, signOut, updateProfile } = useAuthStore();
   const { weightUnit, setWeightUnit } = useSettingsStore();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+  const [isMeasurementsModalVisible, setIsMeasurementsModalVisible] = useState(false);
+
+  // Measurements store
+  const { heightCm, weightKg, sex, updateMeasurements } = useMeasurementsStore();
+
+  // Total sets hook
+  const { totalSets } = useTotalSets();
 
   // Protein store
   const {
     currentProtein,
-    proteinGoal,
     selectedIncrement: proteinIncrement,
     addProtein,
     subtractProtein,
     setSelectedIncrement: setProteinIncrement,
+    setProteinGoal,
+    proteinGoal,
     checkAndResetDaily: checkProteinReset,
   } = useProteinStore();
 
   // Calorie store
   const {
     currentCalories,
-    calorieGoal,
     selectedIncrement: calorieIncrement,
     addCalories,
     subtractCalories,
     setSelectedIncrement: setCalorieIncrement,
+    setCalorieGoal,
+    calorieGoal,
     checkAndResetDaily: checkCalorieReset,
   } = useCalorieStore();
 
+  // Reset daily trackers and update goals based on measurements
   useEffect(() => {
     checkProteinReset();
     checkCalorieReset();
   }, []);
+
+  // Update goals when measurements change
+  useEffect(() => {
+    if (weightKg) {
+      const newProteinGoal = calculateProteinGoal(weightKg, sex);
+      const newCalorieGoal = calculateCalorieGoal(weightKg, sex);
+      setProteinGoal(newProteinGoal);
+      setCalorieGoal(newCalorieGoal);
+    }
+  }, [weightKg, sex]);
 
   const handleSignOut = () => {
     showAlert(
@@ -201,8 +239,18 @@ export default function ProfileScreen() {
     return Math.round(volume).toString();
   };
 
+  const handleSaveMeasurements = (data: { heightCm: number; weightKg: number; sex: 'male' | 'female' }) => {
+    updateMeasurements(data);
+  };
+
+  const useMetric = weightUnit === 'kg';
+
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
       <Text style={styles.title}>Profile</Text>
 
@@ -228,11 +276,17 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Stats Row */}
+      {/* Lifetime Statistics */}
+      <Text style={styles.sectionTitle}>Lifetime Statistics</Text>
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{userStats?.total_workouts || 0}</Text>
           <Text style={styles.statLabel}>Workouts</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statValue}>{totalSets.toLocaleString()}</Text>
+          <Text style={styles.statLabel}>Sets</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
@@ -241,15 +295,39 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Weight Unit Setting */}
-      <TouchableOpacity style={styles.settingRow} onPress={toggleWeightUnit}>
-        <ScaleIcon size={18} />
-        <Text style={styles.settingLabel}>Weight Unit</Text>
-        <View style={styles.unitToggle}>
-          <Text style={[styles.unitOption, weightUnit === 'lbs' && styles.unitOptionActive]}>lbs</Text>
-          <Text style={[styles.unitOption, weightUnit === 'kg' && styles.unitOptionActive]}>kg</Text>
+      {/* Current Measurements */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Current Measurements</Text>
+        <TouchableOpacity
+          style={styles.sectionEditButton}
+          onPress={() => setIsMeasurementsModalVisible(true)}
+          accessibilityLabel="Edit measurements"
+        >
+          <EditIcon size={14} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.measurementsCard}>
+        <View style={styles.measurementItem}>
+          <Text style={styles.measurementLabel}>Sex</Text>
+          <Text style={styles.measurementValue}>
+            {sex === 'male' ? 'Male' : 'Female'}
+          </Text>
         </View>
-      </TouchableOpacity>
+        <View style={styles.measurementDivider} />
+        <View style={styles.measurementItem}>
+          <Text style={styles.measurementLabel}>Height</Text>
+          <Text style={styles.measurementValue}>
+            {formatHeight(heightCm, useMetric)}
+          </Text>
+        </View>
+        <View style={styles.measurementDivider} />
+        <View style={styles.measurementItem}>
+          <Text style={styles.measurementLabel}>Weight</Text>
+          <Text style={styles.measurementValue}>
+            {formatMeasurementWeight(weightKg, useMetric)}
+          </Text>
+        </View>
+      </View>
 
       {/* Macro Tracking Section */}
       <Text style={styles.sectionTitle}>Macro Tracking</Text>
@@ -278,8 +356,16 @@ export default function ProfileScreen() {
         onIncrementChange={setCalorieIncrement}
       />
 
-      {/* Spacer */}
-      <View style={styles.spacer} />
+      {/* Settings */}
+      <Text style={styles.sectionTitle}>Settings</Text>
+      <TouchableOpacity style={styles.settingRow} onPress={toggleWeightUnit}>
+        <ScaleIcon size={18} />
+        <Text style={styles.settingLabel}>Weight Unit</Text>
+        <View style={styles.unitToggle}>
+          <Text style={[styles.unitOption, weightUnit === 'lbs' && styles.unitOptionActive]}>lbs</Text>
+          <Text style={[styles.unitOption, weightUnit === 'kg' && styles.unitOptionActive]}>kg</Text>
+        </View>
+      </TouchableOpacity>
 
       {/* Sign Out */}
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -298,7 +384,17 @@ export default function ProfileScreen() {
         currentName={profile?.display_name}
         currentAvatarUrl={profile?.avatar_url}
       />
-    </View>
+
+      {/* Edit Measurements Modal */}
+      <EditMeasurementsModal
+        visible={isMeasurementsModalVisible}
+        onClose={() => setIsMeasurementsModalVisible(false)}
+        onSave={handleSaveMeasurements}
+        currentHeightCm={heightCm}
+        currentWeightKg={weightKg}
+        currentSex={sex}
+      />
+    </ScrollView>
   );
 }
 
@@ -306,8 +402,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgPrimary,
+  },
+  content: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 40,
   },
   title: {
     fontSize: 28,
@@ -323,7 +421,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgSecondary,
     borderRadius: 14,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 20,
     gap: 12,
   },
   profileInfo: {
@@ -348,20 +446,44 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
+  // Section Header
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  sectionEditButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.bgSecondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+
   // Stats Row
   statsRow: {
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
     paddingVertical: 14,
-    marginBottom: 12,
+    marginBottom: 20,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
@@ -376,46 +498,32 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
 
-  // Setting Row
-  settingRow: {
+  // Measurements Card
+  measurementsCard: {
     flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: colors.bgSecondary,
     borderRadius: 12,
-    padding: 12,
+    paddingVertical: 14,
     marginBottom: 20,
-    gap: 10,
   },
-  settingLabel: {
+  measurementItem: {
     flex: 1,
-    fontSize: 15,
-    color: colors.textPrimary,
+    alignItems: 'center',
   },
-  unitToggle: {
-    flexDirection: 'row',
-    backgroundColor: colors.bgTertiary,
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  unitOption: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  unitOptionActive: {
-    backgroundColor: colors.accent,
-    color: colors.textPrimary,
-  },
-
-  // Section Title
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+  measurementLabel: {
+    fontSize: 11,
     color: colors.textSecondary,
-    textTransform: 'uppercase',
-    marginBottom: 10,
+    marginBottom: 4,
+  },
+  measurementValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+    color: colors.textPrimary,
+  },
+  measurementDivider: {
+    width: 1,
+    backgroundColor: colors.border,
   },
 
   // Tracker Card (shared by protein & calories)
@@ -497,9 +605,37 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // Spacer
-  spacer: {
+  // Setting Row
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 20,
+    gap: 10,
+  },
+  settingLabel: {
     flex: 1,
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  unitToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgTertiary,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  unitOption: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  unitOptionActive: {
+    backgroundColor: colors.accent,
+    color: colors.textPrimary,
   },
 
   // Sign Out
@@ -511,7 +647,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: colors.error + '15',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   signOutText: {
     fontSize: 14,
