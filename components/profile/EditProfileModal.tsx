@@ -46,23 +46,30 @@ function CameraIcon({ size = 24 }: { size?: number }) {
   );
 }
 
+type Sex = 'male' | 'female';
+
 interface EditProfileModalProps {
   visible: boolean;
   onClose: () => void;
   onSave: (displayName: string, avatarUri?: string | null) => Promise<void>;
+  onSexChange: (sex: Sex) => void;
   currentName?: string | null;
   currentAvatarUrl?: string | null;
+  currentSex: Sex;
 }
 
 export default function EditProfileModal({
   visible,
   onClose,
   onSave,
+  onSexChange,
   currentName,
   currentAvatarUrl,
+  currentSex,
 }: EditProfileModalProps) {
   const [displayName, setDisplayName] = useState(currentName || '');
   const [avatarUri, setAvatarUri] = useState<string | null>(currentAvatarUrl || null);
+  const [sex, setSex] = useState<Sex>(currentSex);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset form when modal opens
@@ -70,8 +77,9 @@ export default function EditProfileModal({
     if (visible) {
       setDisplayName(currentName || '');
       setAvatarUri(currentAvatarUrl || null);
+      setSex(currentSex);
     }
-  }, [visible, currentName, currentAvatarUrl]);
+  }, [visible, currentName, currentAvatarUrl, currentSex]);
 
   const handlePickImage = async () => {
     // Request permission
@@ -101,6 +109,10 @@ export default function EditProfileModal({
       // Pass the new avatar URI if it changed, or undefined if it stayed the same
       const hasNewAvatar = avatarUri !== currentAvatarUrl;
       await onSave(displayName.trim(), hasNewAvatar ? avatarUri : undefined);
+      // Save sex if changed
+      if (sex !== currentSex) {
+        onSexChange(sex);
+      }
       onClose();
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -167,6 +179,30 @@ export default function EditProfileModal({
                 autoCorrect={false}
                 maxLength={50}
               />
+            </View>
+
+            {/* Sex Selection */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Sex</Text>
+              <Text style={styles.inputHint}>Used for protein and calorie goal calculations</Text>
+              <View style={styles.sexToggle}>
+                <TouchableOpacity
+                  style={[styles.sexOption, sex === 'male' && styles.sexOptionActive]}
+                  onPress={() => setSex('male')}
+                >
+                  <Text style={[styles.sexOptionText, sex === 'male' && styles.sexOptionTextActive]}>
+                    Male
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sexOption, sex === 'female' && styles.sexOptionActive]}
+                  onPress={() => setSex('female')}
+                >
+                  <Text style={[styles.sexOptionText, sex === 'female' && styles.sexOptionTextActive]}>
+                    Female
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </KeyboardAvoidingView>
@@ -257,6 +293,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     backgroundColor: colors.bgSecondary,
+    color: colors.textPrimary,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: 10,
+  },
+  sexToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.bgSecondary,
+    borderRadius: 10,
+    padding: 4,
+  },
+  sexOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  sexOptionActive: {
+    backgroundColor: colors.accent,
+  },
+  sexOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  sexOptionTextActive: {
     color: colors.textPrimary,
   },
 });

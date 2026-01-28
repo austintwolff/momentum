@@ -246,13 +246,16 @@ export default function ProfileScreen() {
   const useMetric = weightUnit === 'kg';
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
+    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+      {/* Header */}
+      <Text style={styles.title}>Profile</Text>
+
       {/* Profile Card */}
       <View style={styles.profileCard}>
         <Avatar
           uri={profile?.avatar_url}
           name={profile?.display_name || profile?.username}
-          size={56}
+          size={48}
         />
         <View style={styles.profileInfo}>
           <Text style={styles.name} numberOfLines={1}>
@@ -300,13 +303,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
       <View style={styles.measurementsCard}>
-        <View style={styles.measurementItem}>
-          <Text style={styles.measurementLabel}>Sex</Text>
-          <Text style={styles.measurementValue}>
-            {sex === 'male' ? 'Male' : 'Female'}
-          </Text>
-        </View>
-        <View style={styles.measurementDivider} />
         <View style={styles.measurementItem}>
           <Text style={styles.measurementLabel}>Height</Text>
           <Text style={styles.measurementValue}>
@@ -374,8 +370,10 @@ export default function ProfileScreen() {
         visible={isEditModalVisible}
         onClose={() => setIsEditModalVisible(false)}
         onSave={updateProfile}
+        onSexChange={(newSex) => updateMeasurements({ sex: newSex })}
         currentName={profile?.display_name}
         currentAvatarUrl={profile?.avatar_url}
+        currentSex={sex}
       />
 
       {/* Edit Measurements Modal */}
@@ -397,34 +395,40 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgPrimary,
     paddingHorizontal: 20,
   },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 10,
+  },
 
   // Profile Card
   profileCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
-    gap: 12,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
   },
   profileInfo: {
     flex: 1,
   },
   name: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   username: {
-    fontSize: 13,
+    fontSize: 12,
     color: colors.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: colors.bgTertiary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -435,45 +439,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
     textTransform: 'uppercase',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   sectionEditButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: colors.bgSecondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
 
   // Stats Row
   statsRow: {
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 20,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.textSecondary,
     marginTop: 2,
   },
@@ -486,21 +490,21 @@ const styles = StyleSheet.create({
   measurementsCard: {
     flexDirection: 'row',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    paddingVertical: 14,
-    marginBottom: 20,
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginBottom: 12,
   },
   measurementItem: {
     flex: 1,
     alignItems: 'center',
   },
   measurementLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   measurementValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
@@ -513,18 +517,18 @@ const styles = StyleSheet.create({
   // Tracker Card (shared by protein & calories)
   trackerCard: {
     backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
   },
   trackerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   trackerLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.textPrimary,
   },
@@ -534,7 +538,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   trackerValue: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
     color: colors.textSecondary,
@@ -543,24 +547,24 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   progressBarBg: {
-    height: 5,
+    height: 4,
     backgroundColor: colors.bgTertiary,
-    borderRadius: 2.5,
+    borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: colors.accent,
-    borderRadius: 2.5,
+    borderRadius: 2,
   },
   trackerControls: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 5,
   },
   controlButton: {
-    width: 36,
-    height: 32,
+    width: 34,
+    height: 30,
     borderRadius: 6,
     backgroundColor: colors.bgTertiary,
     alignItems: 'center',
@@ -571,7 +575,7 @@ const styles = StyleSheet.create({
   },
   incrementButton: {
     flex: 1,
-    height: 32,
+    height: 30,
     borderRadius: 6,
     backgroundColor: colors.bgTertiary,
     alignItems: 'center',
@@ -581,7 +585,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   incrementText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
   },
@@ -594,14 +598,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 20,
-    gap: 10,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    gap: 8,
   },
   settingLabel: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textPrimary,
   },
   unitToggle: {
@@ -611,9 +615,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   unitOption: {
-    paddingVertical: 5,
+    paddingVertical: 4,
     paddingHorizontal: 10,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.textMuted,
   },
@@ -627,14 +631,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: colors.error + '15',
-    gap: 8,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 8,
   },
   signOutText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.error,
   },
@@ -642,7 +646,7 @@ const styles = StyleSheet.create({
   // Version
   version: {
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: 10,
     color: colors.textMuted,
   },
 });
