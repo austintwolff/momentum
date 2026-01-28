@@ -6,39 +6,11 @@ import { showAlert } from '@/lib/alert';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore, kgToLbs, WeightUnit } from '@/stores/settings.store';
 import { useProteinStore } from '@/stores/protein.store';
-import { useWorkoutStats } from '@/hooks/useWorkoutStats';
 import { colors } from '@/constants/Colors';
 import Avatar from '@/components/profile/Avatar';
 import EditProfileModal from '@/components/profile/EditProfileModal';
 
 // Custom SVG Icons
-function FlameIcon({ size = 20 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C8.5 5.5 8 8.5 9 11C7 10 6 7.5 6 7.5C3.5 11 4 15 6 18C4.5 17 3 15.5 3 15.5C3.5 19 7.5 22 12 22Z"
-        fill={colors.accent}
-      />
-      <Path
-        d="M12 22C14.5 22 16 20 16 17.5C16 15 14 13 12 11C10 13 8 15 8 17.5C8 20 9.5 22 12 22Z"
-        fill={colors.accentLight}
-      />
-    </Svg>
-  );
-}
-
-// Workout day indicator dot
-function DayDot({ active }: { active: boolean }) {
-  return (
-    <View
-      style={[
-        styles.dayDot,
-        active ? styles.dayDotActive : styles.dayDotInactive,
-      ]}
-    />
-  );
-}
-
 function UserEditIcon({ size = 20 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -141,7 +113,6 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, userStats, signOut, updateProfile } = useAuthStore();
   const { weightUnit, setWeightUnit } = useSettingsStore();
-  const { workoutsThisWeek, weeklyWorkoutDays, streak, avgScore } = useWorkoutStats();
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
 
   // Protein tracker state
@@ -224,47 +195,6 @@ export default function ProfileScreen() {
             {formatVolume(userStats?.total_volume_kg || 0)}
           </Text>
           <Text style={styles.statLabel}>Total Volume</Text>
-        </View>
-      </View>
-
-      {/* Statistics Bar (This Week) */}
-      <View style={styles.statsBar}>
-        <Text style={styles.statsBarTitle}>Statistics (This Week)</Text>
-
-        <View style={styles.statsRow}>
-          {/* Progress Streak */}
-          <View style={styles.statSection}>
-            <View style={styles.statHeader}>
-              <FlameIcon size={14} />
-              <Text style={styles.statHeaderText}>Streak</Text>
-            </View>
-            <Text style={styles.statBarValue}>
-              {streak} Days
-            </Text>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          {/* Workouts */}
-          <View style={styles.statSection}>
-            <Text style={styles.statHeaderText}>Workouts</Text>
-            <View style={styles.workoutsRow}>
-              <Text style={styles.statValueLarge}>{workoutsThisWeek}</Text>
-              <View style={styles.dotsContainer}>
-                {weeklyWorkoutDays.map((active, index) => (
-                  <DayDot key={index} active={active} />
-                ))}
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.statDivider} />
-
-          {/* Avg Workout Score */}
-          <View style={styles.statSection}>
-            <Text style={styles.statHeaderText}>Avg Score</Text>
-            <Text style={styles.statValueLarge}>{avgScore}</Text>
-          </View>
         </View>
       </View>
 
@@ -457,75 +387,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     color: colors.textSecondary,
-  },
-  // Stats Bar
-  statsBar: {
-    backgroundColor: colors.bgSecondary,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 24,
-  },
-  statsBarTitle: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  statsRow: {
-    flexDirection: 'row',
-  },
-  statSection: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statHeaderText: {
-    fontSize: 10,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  statBarValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    color: colors.textPrimary,
-    marginTop: 2,
-  },
-  statValueLarge: {
-    fontSize: 20,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-    color: colors.textPrimary,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 6,
-  },
-  workoutsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dotsContainer: {
-    flexDirection: 'row',
-    gap: 2,
-  },
-  dayDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  dayDotActive: {
-    backgroundColor: colors.accent,
-  },
-  dayDotInactive: {
-    backgroundColor: colors.bgTertiary,
   },
   // Protein Tracker
   proteinSection: {
