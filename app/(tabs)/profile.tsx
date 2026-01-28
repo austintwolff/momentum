@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
@@ -246,14 +246,7 @@ export default function ProfileScreen() {
   const useMetric = weightUnit === 'kg';
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <Text style={styles.title}>Profile</Text>
-
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       {/* Profile Card */}
       <View style={styles.profileCard}>
         <Avatar
@@ -394,7 +387,7 @@ export default function ProfileScreen() {
         currentWeightKg={weightKg}
         currentSex={sex}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -402,16 +395,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bgPrimary,
-  },
-  content: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginBottom: 16,
   },
 
   // Profile Card
