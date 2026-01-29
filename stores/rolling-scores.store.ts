@@ -1,5 +1,9 @@
 import { create } from 'zustand';
-import { calculateRollingScores, RollingScoresResult } from '@/services/rolling-scores.service';
+import {
+  calculateRollingScores,
+  RollingScoresResult,
+  ScoresBreakdown,
+} from '@/services/rolling-scores.service';
 
 // Cache TTL: 5 minutes
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -10,6 +14,7 @@ interface RollingScoresState {
     load: number | null;
     consistency: number | null;
   } | null;
+  breakdown: ScoresBreakdown | null;
   isCalibrated: boolean;
   isLoading: boolean;
   lastCalculated: number | null;
@@ -22,6 +27,7 @@ interface RollingScoresState {
 
 export const useRollingScoresStore = create<RollingScoresState>((set, get) => ({
   scores: null,
+  breakdown: null,
   isCalibrated: false,
   isLoading: false,
   lastCalculated: null,
@@ -53,6 +59,7 @@ export const useRollingScoresStore = create<RollingScoresState>((set, get) => ({
           load: result.load,
           consistency: result.consistency,
         },
+        breakdown: result.breakdown,
         isCalibrated: result.isCalibrated,
         isLoading: false,
         lastCalculated: Date.now(),
@@ -74,6 +81,7 @@ export const useRollingScoresStore = create<RollingScoresState>((set, get) => ({
   reset: () => {
     set({
       scores: null,
+      breakdown: null,
       isCalibrated: false,
       isLoading: false,
       lastCalculated: null,

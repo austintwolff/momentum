@@ -49,6 +49,18 @@ export default function ProgressHeader({
       {/* Title */}
       <Text style={styles.title}>Progress</Text>
 
+      {/* Bi-Weekly Stats Bar */}
+      {!statsLoading && (
+        <View style={styles.statsBarWrapper}>
+          <BiWeeklyStatsBar
+            streak={streak}
+            workoutsCount={workoutsCount}
+            biWeeklyWorkoutDays={biWeeklyWorkoutDays}
+            avgScore={avgScore}
+          />
+        </View>
+      )}
+
       {/* Mode Toggle */}
       <View style={styles.modeToggle}>
         <TouchableOpacity
@@ -102,18 +114,6 @@ export default function ProgressHeader({
           </Text>
           <ChevronDownIcon />
         </TouchableOpacity>
-      )}
-
-      {/* Bi-Weekly Stats Bar */}
-      {!statsLoading && (
-        <View style={styles.statsBarWrapper}>
-          <BiWeeklyStatsBar
-            streak={streak}
-            workoutsCount={workoutsCount}
-            biWeeklyWorkoutDays={biWeeklyWorkoutDays}
-            avgScore={avgScore}
-          />
-        </View>
       )}
     </View>
   );
@@ -177,6 +177,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   statsBarWrapper: {
-    marginTop: 4,
+    marginBottom: 16,
   },
 });

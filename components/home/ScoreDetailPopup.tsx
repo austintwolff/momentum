@@ -1,6 +1,12 @@
 import { View, Text, TouchableOpacity, Modal, Pressable, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
+import type {
+  ScoresBreakdown,
+  ProgressionBreakdown,
+  LoadBreakdown,
+  ConsistencyBreakdown,
+} from '@/services/rolling-scores.service';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DIALOG_WIDTH = Math.min(SCREEN_WIDTH - 48, 340);
@@ -11,6 +17,7 @@ interface ScoreDetailPopupProps {
   visible: boolean;
   scoreType: ScoreType | null;
   score: number | null;
+  breakdown: ScoresBreakdown | null;
   onClose: () => void;
 }
 
@@ -84,32 +91,30 @@ function BreakdownRow({ label, value, progress, hint }: BreakdownRowProps) {
   );
 }
 
-// Generate breakdown data based on score type and value
-function getProgressionBreakdown(score: number) {
-  // Estimate values based on score
-  // Score is: 65% * PR component + 35% * Near-PR component
-  const prCount = score >= 80 ? 4 : score >= 60 ? 3 : score >= 40 ? 2 : score >= 20 ? 1 : 0;
-  const nearPRCount = score >= 70 ? 5 : score >= 50 ? 3 : score >= 30 ? 2 : score >= 15 ? 1 : 0;
-  const avgCloseness = Math.min(90 + (score / 10), 100);
+// Generate breakdown data using real data when available
+function getProgressionBreakdown(data: ProgressionBreakdown | null, score: number) {
+  const prCount = data?.prCount ?? 0;
+  const nearPRCount = data?.nearPrCount ?? 0;
+  const avgCloseness = data?.avgClosenessPercent ?? 0;
 
   return [
     {
       label: 'Personal Records',
       value: prCount === 0 ? 'None' : `${prCount} PR${prCount > 1 ? 's' : ''}`,
-      progress: Math.min(prCount / 4, 1),
+      progress: Math.min(prCount / 6, 1), // Saturates at 6 PRs
       hint: prCount >= 3 ? 'Incredible progress!' : prCount >= 1 ? 'Keep pushing your limits' : 'Focus on beating past performances',
     },
     {
       label: 'Near-PR Lifts',
       value: nearPRCount === 0 ? 'None' : `${nearPRCount} lift${nearPRCount > 1 ? 's' : ''}`,
-      progress: Math.min(nearPRCount / 5, 1),
-      hint: nearPRCount >= 3 ? 'Close to breaking through!' : nearPRCount >= 1 ? 'Almost there on several lifts' : 'Train closer to your max',
+      progress: Math.min(nearPRCount / 8, 1),
+      hint: nearPRCount >= 5 ? 'Close to breaking through!' : nearPRCount >= 1 ? 'Almost there on several lifts' : 'Train closer to your max',
     },
     {
       label: 'Avg. Closeness to PR',
-      value: score > 0 ? `${Math.round(avgCloseness)}%` : '--',
+      value: avgCloseness > 0 ? `${avgCloseness}%` : '--',
       progress: avgCloseness / 100,
-      hint: avgCloseness >= 95 ? 'Training at peak intensity' : avgCloseness >= 90 ? 'Strong effort' : 'Room to push harder',
+      hint: avgCloseness >= 95 ? 'Training at peak intensity' : avgCloseness >= 90 ? 'Strong effort' : avgCloseness > 0 ? 'Room to push harder' : 'No data yet',
     },
     {
       label: 'Progress Trend',
@@ -120,31 +125,29 @@ function getProgressionBreakdown(score: number) {
   ];
 }
 
-function getLoadBreakdown(score: number) {
-  // Estimate values based on score
-  // Score is normalized ratio of current vs baseline load
-  const workingSets = Math.round(10 + (score / 100) * 15);
-  const loadRatio = 50 + (score / 100) * 75; // 50% to 125% of baseline
-  const exerciseCount = Math.round(3 + (score / 100) * 5);
+function getLoadBreakdown(data: LoadBreakdown | null, score: number) {
+  const workingSets = data?.workingSets ?? 0;
+  const loadRatio = data?.loadVsBaselinePercent ?? 0;
+  const exerciseCount = data?.exercisesCompleted ?? 0;
 
   return [
     {
       label: 'Working Sets',
       value: `${workingSets} sets`,
-      progress: Math.min(workingSets / 25, 1),
-      hint: workingSets >= 20 ? 'High volume session' : workingSets >= 15 ? 'Solid volume' : workingSets >= 10 ? 'Moderate volume' : 'Light session',
+      progress: Math.min(workingSets / 100, 1), // 14-day window, so could be high
+      hint: workingSets >= 80 ? 'High volume period' : workingSets >= 50 ? 'Solid volume' : workingSets >= 25 ? 'Moderate volume' : 'Light period',
     },
     {
       label: 'Load vs Baseline',
-      value: `${Math.round(loadRatio)}%`,
+      value: `${loadRatio}%`,
       progress: Math.min(loadRatio / 125, 1),
       hint: loadRatio >= 100 ? 'Exceeding your baseline!' : loadRatio >= 85 ? 'Maintaining well' : 'Room to increase load',
     },
     {
       label: 'Exercises Completed',
       value: `${exerciseCount} exercises`,
-      progress: Math.min(exerciseCount / 8, 1),
-      hint: exerciseCount >= 6 ? 'Great coverage' : exerciseCount >= 4 ? 'Good variety' : 'Focused session',
+      progress: Math.min(exerciseCount / 15, 1),
+      hint: exerciseCount >= 10 ? 'Great variety' : exerciseCount >= 5 ? 'Good coverage' : 'Focused training',
     },
     {
       label: 'Training Intensity',
@@ -155,24 +158,22 @@ function getLoadBreakdown(score: number) {
   ];
 }
 
-function getConsistencyBreakdown(score: number) {
-  // Estimate values based on score
-  // Score is: 45% frequency + 20% gap + 35% coverage
-  const workouts = Math.round(1 + (score / 100) * 9);
-  const maxGap = Math.max(1, Math.round(10 - (score / 100) * 7));
-  const muscleGroups = Math.round(3 + (score / 100) * 9);
-  const coveragePercent = Math.round(25 + (score / 100) * 75);
+function getConsistencyBreakdown(data: ConsistencyBreakdown | null, score: number) {
+  const workouts = data?.workoutsCount ?? 0;
+  const maxGap = data?.longestGapDays ?? 14;
+  const muscleGroups = data?.muscleGroupsHit ?? 0;
+  const coveragePercent = data?.coveragePercent ?? 0;
 
   return [
     {
       label: 'Workouts (14 days)',
       value: `${workouts} of 10`,
-      progress: workouts / 10,
+      progress: Math.min(workouts / 10, 1),
       hint: workouts >= 8 ? 'Crushing it!' : workouts >= 5 ? 'Good rhythm' : workouts >= 3 ? 'Building habit' : 'Get back at it',
     },
     {
       label: 'Longest Gap',
-      value: `${maxGap} day${maxGap > 1 ? 's' : ''}`,
+      value: `${maxGap} day${maxGap !== 1 ? 's' : ''}`,
       progress: Math.max(0, 1 - (maxGap - 1) / 9),
       hint: maxGap <= 2 ? 'No long breaks' : maxGap <= 4 ? 'Minor gaps' : 'Try for shorter breaks',
     },
@@ -224,14 +225,14 @@ function getScoreDescription(type: ScoreType): string {
   }
 }
 
-function getBreakdownData(type: ScoreType, score: number) {
+function getBreakdownData(type: ScoreType, score: number, breakdown: ScoresBreakdown | null) {
   switch (type) {
     case 'progression':
-      return getProgressionBreakdown(score);
+      return getProgressionBreakdown(breakdown?.progression ?? null, score);
     case 'load':
-      return getLoadBreakdown(score);
+      return getLoadBreakdown(breakdown?.load ?? null, score);
     case 'consistency':
-      return getConsistencyBreakdown(score);
+      return getConsistencyBreakdown(breakdown?.consistency ?? null, score);
   }
 }
 
@@ -240,11 +241,12 @@ export default function ScoreDetailPopup({
   visible,
   scoreType,
   score,
+  breakdown,
   onClose,
 }: ScoreDetailPopupProps) {
   if (!scoreType || score === null) return null;
 
-  const breakdownData = getBreakdownData(scoreType, score);
+  const breakdownData = getBreakdownData(scoreType, score, breakdown);
 
   return (
     <Modal visible={visible} transparent animationType="fade">

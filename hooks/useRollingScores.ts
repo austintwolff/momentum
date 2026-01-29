@@ -12,6 +12,7 @@ export function useRollingScores() {
   const { user } = useAuthStore();
   const {
     scores,
+    breakdown,
     isCalibrated,
     isLoading,
     error,
@@ -28,6 +29,7 @@ export function useRollingScores() {
     progression: scores?.progression ?? null,
     load: scores?.load ?? null,
     consistency: scores?.consistency ?? null,
+    breakdown,
     isCalibrated,
     isLoading,
     error,

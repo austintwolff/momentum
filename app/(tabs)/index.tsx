@@ -62,7 +62,7 @@ export default function HomeScreen() {
   const { refreshUserStats } = useAuthStore();
 
   // Rolling scores from 14-day window
-  const { progression, load, consistency } = useRollingScores();
+  const { progression, load, consistency, breakdown } = useRollingScores();
 
   // Score detail popup state
   const [popupVisible, setPopupVisible] = useState(false);
@@ -149,6 +149,7 @@ export default function HomeScreen() {
         visible={popupVisible}
         scoreType={selectedScoreType}
         score={getSelectedScore()}
+        breakdown={breakdown}
         onClose={() => setPopupVisible(false)}
       />
     </View>

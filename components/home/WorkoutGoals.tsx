@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Path, Circle, Polyline } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
+import { useDailyGoals } from '@/hooks/useDailyGoals';
 
 // Icons matching the dial icons for visual connection
 function ProgressionGoalIcon({ size = 14 }: { size?: number }) {
@@ -102,36 +103,32 @@ function GoalItem({ icon, label, description, progress, isComplete, boostLabel }
   );
 }
 
-interface WorkoutGoalsProps {
-  // For now, using static boilerplate data
-  // Later these will be calculated from actual workout data
-}
+export function WorkoutGoals() {
+  const { progressionGoal, loadGoal, consistencyGoal } = useDailyGoals();
 
-export function WorkoutGoals({}: WorkoutGoalsProps) {
-  // Boilerplate goals - these will be dynamic later
   const goals = [
     {
       icon: <ProgressionGoalIcon />,
       label: 'Progression',
-      description: 'Beat a personal record today',
-      progress: 0,
-      isComplete: false,
+      description: progressionGoal.description,
+      progress: progressionGoal.progress,
+      isComplete: progressionGoal.isComplete,
       boostLabel: '+5',
     },
     {
       icon: <LoadGoalIcon />,
       label: 'Load',
-      description: 'Complete 15 working sets today',
-      progress: 0,
-      isComplete: false,
+      description: loadGoal.description,
+      progress: loadGoal.progress,
+      isComplete: loadGoal.isComplete,
       boostLabel: '+5',
     },
     {
       icon: <ConsistencyGoalIcon />,
       label: 'Consistency',
-      description: 'Complete a workout today',
-      progress: 0,
-      isComplete: false,
+      description: consistencyGoal.description,
+      progress: consistencyGoal.progress,
+      isComplete: consistencyGoal.isComplete,
       boostLabel: '+5',
     },
   ];

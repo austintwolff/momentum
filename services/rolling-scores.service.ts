@@ -75,11 +75,37 @@ const db = supabase as any;
 // TYPES
 // ============================================================================
 
+export interface ProgressionBreakdown {
+  prCount: number;
+  nearPrCount: number;
+  avgClosenessPercent: number;
+}
+
+export interface LoadBreakdown {
+  workingSets: number;
+  loadVsBaselinePercent: number;
+  exercisesCompleted: number;
+}
+
+export interface ConsistencyBreakdown {
+  workoutsCount: number;
+  longestGapDays: number;
+  muscleGroupsHit: number;
+  coveragePercent: number;
+}
+
+export interface ScoresBreakdown {
+  progression: ProgressionBreakdown;
+  load: LoadBreakdown;
+  consistency: ConsistencyBreakdown;
+}
+
 export interface RollingScoresResult {
   progression: number | null;
   load: number | null;
   consistency: number | null;
   isCalibrated: boolean;
+  breakdown: ScoresBreakdown | null;
 }
 
 interface WorkoutWithSets {
@@ -125,23 +151,29 @@ export async function calculateRollingScores(
         load: null,
         consistency: null,
         isCalibrated: false,
+        breakdown: null,
       };
     }
 
     const { windowStart, windowEnd } = getWindowBoundaries();
     const workouts = await fetchWorkoutsWithSets(userId, windowStart, windowEnd);
 
-    const [progression, load, consistency] = await Promise.all([
-      calculateProgressionScore(userId, workouts, windowStart),
-      calculateLoadScore(userId, workouts, windowStart),
-      calculateConsistencyScore(workouts),
+    const [progressionResult, loadResult, consistencyResult] = await Promise.all([
+      calculateProgressionScoreWithBreakdown(userId, workouts, windowStart),
+      calculateLoadScoreWithBreakdown(userId, workouts, windowStart),
+      calculateConsistencyScoreWithBreakdown(workouts),
     ]);
 
     return {
-      progression,
-      load,
-      consistency,
+      progression: progressionResult.score,
+      load: loadResult.score,
+      consistency: consistencyResult.score,
       isCalibrated: true,
+      breakdown: {
+        progression: progressionResult.breakdown,
+        load: loadResult.breakdown,
+        consistency: consistencyResult.breakdown,
+      },
     };
   } catch (error) {
     console.error('[RollingScores] Error calculating scores:', error);
@@ -150,6 +182,7 @@ export async function calculateRollingScores(
       load: null,
       consistency: null,
       isCalibrated: false,
+      breakdown: null,
     };
   }
 }
@@ -403,13 +436,21 @@ async function fetchAllTimeMaxReps(
 // PROGRESSION SCORE
 // ============================================================================
 
-async function calculateProgressionScore(
+interface ProgressionScoreResult {
+  score: number;
+  breakdown: ProgressionBreakdown;
+}
+
+async function calculateProgressionScoreWithBreakdown(
   userId: string,
   workouts: WorkoutWithSets[],
   windowStart: Date
-): Promise<number> {
+): Promise<ProgressionScoreResult> {
   if (workouts.length === 0) {
-    return 0;
+    return {
+      score: 0,
+      breakdown: { prCount: 0, nearPrCount: 0, avgClosenessPercent: 0 },
+    };
   }
 
   const setsByExercise = new Map<string, SetData[]>();
@@ -435,7 +476,10 @@ async function calculateProgressionScore(
 
   const allExerciseIds = [...setsByExercise.keys()];
   if (allExerciseIds.length === 0) {
-    return 0;
+    return {
+      score: 0,
+      breakdown: { prCount: 0, nearPrCount: 0, avgClosenessPercent: 0 },
+    };
   }
 
   const [baselines, allTimeMaxWeights, allTimeMaxReps] = await Promise.all([
@@ -446,6 +490,7 @@ async function calculateProgressionScore(
 
   let prCount = 0;
   const nearPrRatios: number[] = [];
+  const allClosenessRatios: number[] = [];
 
   for (const [exerciseId, sets] of setsByExercise) {
     const baseline = baselines.get(exerciseId);
@@ -471,6 +516,7 @@ async function calculateProgressionScore(
 
         if (baseline && baseline.bestReps > 0) {
           const ratio = set.reps / baseline.bestReps;
+          allClosenessRatios.push(Math.min(ratio, 1.0));
           if (ratio >= ROLLING_SCORES_CONFIG.PROGRESSION.NEAR_PR_THRESHOLD) {
             nearPrRatios.push(Math.min(ratio, 1.0));
           }
@@ -489,6 +535,7 @@ async function calculateProgressionScore(
 
         if (baseline && baseline.bestE1rm > 0) {
           const ratio = e1rm / baseline.bestE1rm;
+          allClosenessRatios.push(Math.min(ratio, 1.0));
           if (ratio >= ROLLING_SCORES_CONFIG.PROGRESSION.NEAR_PR_THRESHOLD) {
             nearPrRatios.push(Math.min(ratio, 1.0));
           }
@@ -514,19 +561,37 @@ async function calculateProgressionScore(
     ROLLING_SCORES_CONFIG.PROGRESSION.PR_WEIGHT * prComponent +
     ROLLING_SCORES_CONFIG.PROGRESSION.NEAR_PR_WEIGHT * nearPrComponent;
 
-  return Math.round(score * 100);
+  // Calculate average closeness percentage
+  const avgClosenessPercent = allClosenessRatios.length > 0
+    ? Math.round((allClosenessRatios.reduce((a, b) => a + b, 0) / allClosenessRatios.length) * 100)
+    : 0;
+
+  return {
+    score: Math.round(score * 100),
+    breakdown: {
+      prCount,
+      nearPrCount: nearPrRatios.length,
+      avgClosenessPercent,
+    },
+  };
 }
 
 // ============================================================================
 // LOAD SCORE
 // ============================================================================
 
-async function calculateLoadScore(
+interface LoadScoreResult {
+  score: number;
+  breakdown: LoadBreakdown;
+}
+
+async function calculateLoadScoreWithBreakdown(
   userId: string,
   workouts: WorkoutWithSets[],
   windowStart: Date
-): Promise<number> {
+): Promise<LoadScoreResult> {
   let currentLoadUnits = 0;
+  let workingSetsCount = 0;
 
   const exerciseIds = new Set<string>();
   for (const workout of workouts) {
@@ -544,6 +609,11 @@ async function calculateLoadScore(
       const esu = set.set_type === 'warmup'
         ? ROLLING_SCORES_CONFIG.LOAD.ESU_WARMUP
         : ROLLING_SCORES_CONFIG.LOAD.ESU_WORKING;
+
+      // Count working sets (non-warmup)
+      if (set.set_type !== 'warmup') {
+        workingSetsCount++;
+      }
 
       let intensityMult = 1.0;
 
@@ -578,7 +648,14 @@ async function calculateLoadScore(
   const normalizedScore = (ratio - MIN_RATIO) / (MAX_RATIO - MIN_RATIO);
   const score = Math.max(0, Math.min(1, normalizedScore));
 
-  return Math.round(score * 100);
+  return {
+    score: Math.round(score * 100),
+    breakdown: {
+      workingSets: workingSetsCount,
+      loadVsBaselinePercent: Math.round(ratio * 100),
+      exercisesCompleted: exerciseIds.size,
+    },
+  };
 }
 
 async function calculateBaselineLoad(
@@ -618,9 +695,14 @@ async function calculateBaselineLoad(
 // CONSISTENCY SCORE
 // ============================================================================
 
-async function calculateConsistencyScore(
+interface ConsistencyScoreResult {
+  score: number;
+  breakdown: ConsistencyBreakdown;
+}
+
+async function calculateConsistencyScoreWithBreakdown(
   workouts: WorkoutWithSets[]
-): Promise<number> {
+): Promise<ConsistencyScoreResult> {
   const freqScore = Math.min(
     workouts.length / ROLLING_SCORES_CONFIG.CONSISTENCY.TARGET_WORKOUTS,
     1.0
@@ -672,7 +754,11 @@ async function calculateConsistencyScore(
   }
 
   let coverageSum = 0;
+  let muscleGroupsHit = 0;
   for (const days of muscleDays.values()) {
+    if (days.size > 0) {
+      muscleGroupsHit++;
+    }
     const muscleScore = Math.min(
       days.size / ROLLING_SCORES_CONFIG.CONSISTENCY.TARGET_MUSCLE_DAYS,
       1.0
@@ -684,7 +770,15 @@ async function calculateConsistencyScore(
   const { FREQ_WEIGHT, GAP_WEIGHT, COVERAGE_WEIGHT } = ROLLING_SCORES_CONFIG.CONSISTENCY;
   const score = FREQ_WEIGHT * freqScore + GAP_WEIGHT * gapScore + COVERAGE_WEIGHT * coverageScore;
 
-  return Math.round(score * 100);
+  return {
+    score: Math.round(score * 100),
+    breakdown: {
+      workoutsCount: workouts.length,
+      longestGapDays: maxGap,
+      muscleGroupsHit,
+      coveragePercent: Math.round(coverageScore * 100),
+    },
+  };
 }
 
 // ============================================================================
