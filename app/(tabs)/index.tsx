@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { useAuthStore } from '@/stores/auth.store';
+import { useOnboardingStore } from '@/stores/onboarding.store';
 import { colors } from '@/constants/Colors';
 import { ScoreDial } from '@/components/home/ScoreDial';
 import { WorkoutGoals } from '@/components/home/WorkoutGoals';
 import { TrainingFrequency } from '@/components/home/TrainingFrequency';
 import { useRollingScores } from '@/hooks/useRollingScores';
 import ScoreDetailPopup, { ScoreType } from '@/components/home/ScoreDetailPopup';
+import TutorialModal from '@/components/home/TutorialModal';
 
 // Custom SVG Icons for Dials
 function ProgressionIcon({ size = 18 }: { size?: number }) {
@@ -56,10 +58,21 @@ function ConsistencyIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+function InfoIcon({ size = 20 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="10" stroke={colors.textMuted} strokeWidth={2} />
+      <Path d="M12 16V12" stroke={colors.textMuted} strokeWidth={2} strokeLinecap="round" />
+      <Circle cx="12" cy="8" r="1" fill={colors.textMuted} />
+    </Svg>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { refreshUserStats } = useAuthStore();
+  const { hasSeenTutorial, setHasSeenTutorial } = useOnboardingStore();
 
   // Rolling scores from 14-day window
   const { progression, load, consistency, breakdown } = useRollingScores();
@@ -67,6 +80,9 @@ export default function HomeScreen() {
   // Score detail popup state
   const [popupVisible, setPopupVisible] = useState(false);
   const [selectedScoreType, setSelectedScoreType] = useState<ScoreType | null>(null);
+
+  // Tutorial modal state
+  const [tutorialVisible, setTutorialVisible] = useState(false);
 
   const handleDialPress = (type: ScoreType) => {
     setSelectedScoreType(type);
@@ -91,18 +107,39 @@ export default function HomeScreen() {
     refreshUserStats();
   }, []);
 
+  // Show tutorial on first open
+  useEffect(() => {
+    if (!hasSeenTutorial) {
+      setTutorialVisible(true);
+    }
+  }, [hasSeenTutorial]);
+
+  const handleTutorialClose = () => {
+    setTutorialVisible(false);
+    setHasSeenTutorial(true);
+  };
+
   const handleStartWorkout = () => {
     router.push('/workout/new');
   };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Logo */}
-      <Image
-        source={require('@/assets/images/momentum-logo.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      {/* Header with Logo and Info Icon */}
+      <View style={styles.headerRow}>
+        <Image
+          source={require('@/assets/images/momentum-logo.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <TouchableOpacity
+          style={styles.infoButton}
+          onPress={() => setTutorialVisible(true)}
+          accessibilityLabel="How to use"
+        >
+          <InfoIcon size={22} />
+        </TouchableOpacity>
+      </View>
 
       {/* Score Dials */}
       <View style={styles.dialsContainer}>
@@ -152,6 +189,9 @@ export default function HomeScreen() {
         breakdown={breakdown}
         onClose={() => setPopupVisible(false)}
       />
+
+      {/* Tutorial Modal */}
+      <TutorialModal visible={tutorialVisible} onClose={handleTutorialClose} />
     </View>
   );
 }
@@ -163,11 +203,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: -8,
+  },
   logo: {
     width: '65%',
     height: 90,
-    alignSelf: 'center',
-    marginBottom: -8,
+  },
+  infoButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 8,
   },
 
   // Score Dials
