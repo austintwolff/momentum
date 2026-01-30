@@ -58,7 +58,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      // Add timeout to prevent hanging on web
+      const timeoutPromise = new Promise<{ data: { session: null } }>((resolve) => {
+        setTimeout(() => {
+          console.warn('Auth session check timed out');
+          resolve({ data: { session: null } });
+        }, 5000); // 5 second timeout
+      });
+
+      const sessionPromise = supabase.auth.getSession();
+      const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
 
       set({
         session,
@@ -68,8 +77,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (session?.user) {
-        await get().fetchProfile();
-        await get().fetchUserStats();
+        // Don't await these - let them run in background
+        get().fetchProfile().catch(console.error);
+        get().fetchUserStats().catch(console.error);
       }
 
       // Listen for auth changes
@@ -80,8 +90,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
 
         if (session?.user) {
-          await get().fetchProfile();
-          await get().fetchUserStats();
+          get().fetchProfile().catch(console.error);
+          get().fetchUserStats().catch(console.error);
         } else {
           set({ profile: null, userStats: null });
         }
