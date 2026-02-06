@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 
@@ -55,6 +55,21 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
+  // Timeout for font loading on web (fonts may fail to load due to path issues)
+  const [fontTimeout, setFontTimeout] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!loaded) {
+        console.warn('Font loading timed out, proceeding without custom fonts');
+        setFontTimeout(true);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [loaded]);
+
+  const fontsReady = loaded || fontTimeout;
+
   const initialize = useAuthStore((state) => state.initialize);
   const isInitialized = useAuthStore((state) => state.isInitialized);
 
@@ -69,12 +84,12 @@ export default function RootLayout() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded && isInitialized) {
+    if (fontsReady && isInitialized) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, isInitialized]);
+  }, [fontsReady, isInitialized]);
 
-  if (!loaded || !isInitialized) {
+  if (!fontsReady || !isInitialized) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingLogo}>Momentum</Text>

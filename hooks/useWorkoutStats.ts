@@ -100,35 +100,43 @@ export function useWorkoutStats(): WorkoutStats {
 
     try {
       const weekStart = getWeekStartMonday();
+      const sixtyDaysAgo = new Date();
+      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-      // Fetch workouts this week for the workout counter, day dots, and avg score
-      const { data: weekWorkouts, error: weekError } = await (supabase
+      // Single query: fetch last 60 days for both streak and weekly stats
+      const { data: allWorkouts, error } = await (supabase
         .from('workout_sessions') as any)
         .select('completed_at, final_score')
         .eq('user_id', user.id)
-        .gte('completed_at', weekStart.toISOString())
-        .order('completed_at', { ascending: true });
+        .gte('completed_at', sixtyDaysAgo.toISOString())
+        .order('completed_at', { ascending: false });
 
-      if (weekError) {
-        console.error('Error fetching weekly workouts:', weekError);
+      if (error) {
+        console.error('Error fetching workouts:', error);
       }
 
       // Calculate which days of the week had workouts (Mon=0, Sun=6)
       const weeklyWorkoutDays = [false, false, false, false, false, false, false];
       const workoutDatesThisWeek: Date[] = [];
       const scores: number[] = [];
+      const allWorkoutDates: Date[] = [];
 
-      if (weekWorkouts) {
-        weekWorkouts.forEach((workout: { completed_at: string; final_score: number | null }) => {
+      if (allWorkouts) {
+        allWorkouts.forEach((workout: { completed_at: string; final_score: number | null }) => {
           const date = new Date(workout.completed_at);
-          workoutDatesThisWeek.push(date);
+          allWorkoutDates.push(date);
 
-          let dayIndex = date.getDay() - 1; // Convert: Sun=0 -> Mon=0
-          if (dayIndex < 0) dayIndex = 6; // Sunday becomes 6
-          weeklyWorkoutDays[dayIndex] = true;
+          // Check if this workout is from the current week
+          if (date >= weekStart) {
+            workoutDatesThisWeek.push(date);
 
-          if (workout.final_score != null) {
-            scores.push(workout.final_score);
+            let dayIndex = date.getDay() - 1; // Convert: Sun=0 -> Mon=0
+            if (dayIndex < 0) dayIndex = 6; // Sunday becomes 6
+            weeklyWorkoutDays[dayIndex] = true;
+
+            if (workout.final_score != null) {
+              scores.push(workout.final_score);
+            }
           }
         });
       }
@@ -137,25 +145,6 @@ export function useWorkoutStats(): WorkoutStats {
       const avgScore = scores.length > 0
         ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length)
         : 0;
-
-      // Fetch all workout dates for streak calculation (last 60 days should be enough)
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
-      const { data: allWorkouts, error: streakError } = await (supabase
-        .from('workout_sessions') as any)
-        .select('completed_at')
-        .eq('user_id', user.id)
-        .gte('completed_at', sixtyDaysAgo.toISOString())
-        .order('completed_at', { ascending: false });
-
-      if (streakError) {
-        console.error('Error fetching workouts for streak:', streakError);
-      }
-
-      const allWorkoutDates = allWorkouts
-        ? allWorkouts.map((w: { completed_at: string }) => new Date(w.completed_at))
-        : [];
 
       const streak = calculateStreak(allWorkoutDates);
 

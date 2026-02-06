@@ -165,7 +165,7 @@ export async function saveWorkoutToDatabase(
     // 5. Update user stats
     const { data: currentStatsData, error: statsError } = await supabase
       .from('user_stats')
-      .select('*')
+      .select('total_workouts, total_volume_kg, current_workout_streak, longest_workout_streak, last_workout_at')
       .eq('user_id', userId)
       .single();
 
@@ -420,7 +420,7 @@ export async function getWorkoutDetail(workoutId: string): Promise<any | null> {
 export async function fetchExercisesFromDatabase(): Promise<any[]> {
   const { data, error } = await supabase
     .from('exercises')
-    .select('*')
+    .select('id, name, description, exercise_type, muscle_group, equipment, is_compound, is_public')
     .eq('is_public', true)
     .order('name');
 
@@ -555,7 +555,7 @@ export async function deleteWorkout(workoutId: string, userId: string): Promise<
   try {
     const { data: workout, error: fetchError } = await supabase
       .from('workout_sessions')
-      .select('*')
+      .select('id, user_id, total_volume_kg')
       .eq('id', workoutId)
       .eq('user_id', userId)
       .single() as { data: any; error: any };
@@ -590,7 +590,7 @@ export async function deleteWorkout(workoutId: string, userId: string): Promise<
     // Update user stats
     const { data: currentStats } = await supabase
       .from('user_stats')
-      .select('*')
+      .select('total_workouts, total_volume_kg')
       .eq('user_id', userId)
       .single() as { data: any };
 

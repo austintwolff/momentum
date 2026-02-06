@@ -23,7 +23,7 @@ envContent.split('\n').forEach(line => {
 });
 
 const supabaseUrl = envVars.EXPO_PUBLIC_SUPABASE_URL || 'https://zrjsbkpzqnkzdustqvgf.supabase.co';
-const supabaseKey = envVars.EXPO_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || envVars.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseKey = envVars.SUPABASE_SERVICE_ROLE_KEY || envVars.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (!supabaseKey) {
   console.error('Missing Supabase key in .env file');

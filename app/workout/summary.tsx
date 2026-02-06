@@ -204,7 +204,7 @@ export default function WorkoutSummaryScreen() {
 
   useEffect(() => {
     checkScale.value = withSpring(1, { damping: 12 });
-    scoreScale.value = withDelay(200, withSpring(1, { damping: 10 }));
+    scoreScale.value = withDelay(200, withSpring(1, { damping: 18 }));
     breakdownOpacity.value = withDelay(400, withTiming(1, { duration: 300 }));
     statsOpacity.value = withDelay(600, withTiming(1, { duration: 300 }));
   }, []);
@@ -304,7 +304,7 @@ export default function WorkoutSummaryScreen() {
             <View style={styles.statCard}>
               <ClockIcon />
               <Text style={styles.statValue}>{formatDuration(duration)}</Text>
-              <Text style={styles.statLabel}>duration</Text>
+              <Text style={styles.statLabel}>Duration</Text>
             </View>
 
             {topPerformerName ? (
@@ -312,20 +312,20 @@ export default function WorkoutSummaryScreen() {
                 <TrophyIcon />
                 <Text style={styles.statValue} numberOfLines={1}>{topPerformerPercent}%</Text>
                 <Text style={styles.topPerformerName} numberOfLines={1}>{topPerformerName}</Text>
-                <Text style={styles.statLabel}>top performer</Text>
+                <Text style={styles.statLabel}>Top Performer</Text>
               </View>
             ) : (
               <View style={styles.statCard}>
                 <SetsIcon />
                 <Text style={styles.statValue}>{totalSets}</Text>
-                <Text style={styles.statLabel}>sets</Text>
+                <Text style={styles.statLabel}>Sets</Text>
               </View>
             )}
 
             <View style={styles.statCard}>
               <ExerciseIcon />
               <Text style={styles.statValue}>{exerciseCount}</Text>
-              <Text style={styles.statLabel}>exercises</Text>
+              <Text style={styles.statLabel}>Exercises</Text>
             </View>
           </View>
         </Animated.View>
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     color: colors.textMuted,
-    textTransform: 'lowercase',
+    textTransform: 'none',
   },
   doneButton: {
     backgroundColor: colors.accent,

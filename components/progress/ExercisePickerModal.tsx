@@ -113,7 +113,14 @@ export default function ExercisePickerModal({
       >
         <View style={styles.exerciseInfo}>
           <Text style={styles.exerciseName}>{item.name}</Text>
-          <Text style={styles.muscleGroup}>{item.muscle_group}</Text>
+          <Text style={styles.muscleGroup}>
+            {item.muscle_group}
+            {item.equipment && item.equipment.length > 0
+              ? ` · ${item.equipment[0].charAt(0).toUpperCase() + item.equipment[0].slice(1)}`
+              : item.exercise_type === 'bodyweight'
+              ? ' · Bodyweight'
+              : ''}
+          </Text>
         </View>
         {isSelected && <CheckIcon />}
       </TouchableOpacity>

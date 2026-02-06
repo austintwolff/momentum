@@ -24,7 +24,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.austinwolff.momentum"
+      "package": "com.austinwolff.momentum",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -33,13 +37,28 @@
     },
     "plugins": [
       "expo-router",
-      ["expo-image-picker", {
-        "photosPermission": "The app needs access to your photos to set a profile picture."
-      }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos to set a profile picture."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "baseUrl": "/momentum"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "09cb8c15-cf02-424c-898b-1fc6a04d922c"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/09cb8c15-cf02-424c-898b-1fc6a04d922c"
     }
   }
 }

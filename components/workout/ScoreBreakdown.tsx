@@ -18,14 +18,7 @@ interface BreakdownRowProps {
 }
 
 function BreakdownRow({ label, value, progress, hint }: BreakdownRowProps) {
-  const getBarColor = (pct: number): string => {
-    if (pct >= 0.8) return colors.success;
-    if (pct >= 0.5) return colors.accent;
-    if (pct >= 0.25) return colors.warning;
-    return colors.textMuted;
-  };
-
-  const barColor = getBarColor(progress);
+  const barColor = colors.accent;
 
   return (
     <View style={styles.row}>

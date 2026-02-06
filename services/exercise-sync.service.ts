@@ -48,7 +48,7 @@ async function performSync(): Promise<Exercise[]> {
     // 1. Fetch all existing exercises from database
     const { data: existingExercises, error: fetchError } = await supabase
       .from('exercises')
-      .select('*')
+      .select('id, name, description, exercise_type, muscle_group, equipment, is_compound, is_public, created_by, created_at')
       .eq('is_public', true)
       .order('name');
 
