@@ -15,7 +15,7 @@ import { showAlert } from '@/lib/alert';
 import { colors } from '@/constants/Colors';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
-import { useSettingsStore, lbsToKg } from '@/stores/settings.store';
+import { useSettingsStore, lbsToKg, kgToLbs } from '@/stores/settings.store';
 import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet, getUserTopAndRecentExercises } from '@/services/workout.service';
 import { syncAndFetchExercises, clearExerciseCache } from '@/services/exercise-sync.service';
 import ExercisePicker from '@/components/workout/ExercisePicker';
@@ -215,6 +215,9 @@ export default function ExerciseDeckScreen() {
   // Popup state for quick logging from list view
   const [logPopupVisible, setLogPopupVisible] = useState(false);
   const [logPopupExercise, setLogPopupExercise] = useState<Exercise | null>(null);
+
+  // Draft sets per exercise — survives popup open/close for superset support
+  const [draftSets, setDraftSets] = useState<Map<string, DetailedSet[]>>(new Map());
 
   // Animation state for exercise completion
   const [completingExerciseId, setCompletingExerciseId] = useState<string | null>(null);
@@ -630,13 +633,22 @@ export default function ExerciseDeckScreen() {
       }
     }
 
-    // Alphabetize both lists
-    const sortByName = (a: Exercise, b: Exercise) => a.name.localeCompare(b.name);
-    prioritized.sort(sortByName);
-    rest.sort(sortByName);
+    // Sort: completed exercises sink to bottom, alphabetical within each group
+    const isExerciseCompleted = (id: string) =>
+      deckExercises.find(item => item.exercise.id === id)?.isCompleted ?? false;
+
+    const sortWithCompletedLast = (a: Exercise, b: Exercise) => {
+      const ac = isExerciseCompleted(a.id);
+      const bc = isExerciseCompleted(b.id);
+      if (ac !== bc) return ac ? 1 : -1;
+      return a.name.localeCompare(b.name);
+    };
+
+    prioritized.sort(sortWithCompletedLast);
+    rest.sort(sortWithCompletedLast);
 
     return { prioritized, rest };
-  }, [exercises, workoutMuscleGroups, searchQuery, prioritizedExerciseIds]);
+  }, [exercises, workoutMuscleGroups, searchQuery, prioritizedExerciseIds, deckExercises]);
 
   // Combined list with divider marker for FlatList
   type ListItem = Exercise | { type: 'divider' };
@@ -802,8 +814,32 @@ export default function ExerciseDeckScreen() {
   // Handle starting an exercise from the list view - opens popup
   const handleStartFromList = useCallback((exercise: Exercise) => {
     setLogPopupExercise(exercise);
+
+    // Priority: draft > completed sets > fresh
+    const draft = draftSets.get(exercise.id);
+    if (draft) {
+      setLogPopupVisible(true);
+      return;
+    }
+
+    // Check for completed exercise with saved sets — convert to draft for editing
+    const deckItem = deckExercises.find(item => item.exercise.id === exercise.id);
+    if (deckItem?.isCompleted && deckItem.sets.length > 0) {
+      const isDumbbell = exercise.equipment?.some(e => e.toLowerCase() === 'dumbbell') ?? false;
+      const converted: DetailedSet[] = deckItem.sets.map(s => {
+        let displayWeight = '';
+        if (s.weight !== null && s.weight !== undefined) {
+          const inUnit = weightUnit === 'lbs' ? kgToLbs(s.weight) : s.weight;
+          const perHand = isDumbbell ? inUnit / 2 : inUnit;
+          displayWeight = Math.round(perHand).toString();
+        }
+        return { id: s.id, reps: s.reps > 0 ? s.reps.toString() : '', weight: displayWeight, isComplete: true, isEdited: true };
+      });
+      setDraftSets(prev => new Map(prev).set(exercise.id, converted));
+    }
+
     setLogPopupVisible(true);
-  }, []);
+  }, [draftSets, deckExercises, weightUnit]);
 
   // Handle finishing an exercise from the popup
   const handleFinishExerciseFromPopup = useCallback((
@@ -863,17 +899,29 @@ export default function ExerciseDeckScreen() {
         });
       }
 
-      // Mark exercise completed
-      const exerciseItem = activeWorkout?.exercises[currentDeckIndex];
-      if (exerciseItem) {
-        markExerciseCompleted(exerciseItem.id);
+      // Mark exercise completed — read fresh state (closure's activeWorkout is stale)
+      const freshWorkout = useWorkoutStore.getState().activeWorkout;
+      const freshItem = freshWorkout?.exercises.find(
+        ex => ex.exercise.id === logPopupExercise.id
+      );
+      if (freshItem) {
+        markExerciseCompleted(freshItem.id);
+      }
+
+      // Clear draft for this exercise
+      if (logPopupExercise) {
+        setDraftSets(prev => {
+          const next = new Map(prev);
+          next.delete(logPopupExercise.id);
+          return next;
+        });
       }
 
       // Close popup
       setLogPopupVisible(false);
       setLogPopupExercise(null);
     }, 50);
-  }, [logPopupExercise, profile, getDeckIndex, addExercise, deckExercises.length, saveSetsForExercise, logSimpleSets, markExerciseCompleted, activeWorkout]);
+  }, [logPopupExercise, profile, getDeckIndex, addExercise, deckExercises.length, saveSetsForExercise, logSimpleSets, markExerciseCompleted]);
 
   // Render list view row (shows full pool of exercises) or divider
   const renderListItem = useCallback(({ item }: { item: ListItem }) => {
@@ -893,6 +941,7 @@ export default function ExerciseDeckScreen() {
     const equipmentType = getEquipmentType(exercise.equipment, exercise.exercise_type);
     const deckData = getDeckExerciseData(exercise.id);
     const isCompleted = deckData?.isCompleted ?? false;
+    const hasDraft = draftSets.has(exercise.id);
 
     return (
       <View style={[
@@ -937,9 +986,13 @@ export default function ExerciseDeckScreen() {
           </View>
         </TouchableOpacity>
         {isCompleted ? (
-          <View style={styles.listRowCompletedButton}>
+          <TouchableOpacity style={styles.listRowCompletedButton} onPress={() => handleStartFromList(exercise)} activeOpacity={0.8}>
             <Text style={styles.listRowCompletedText}>Completed</Text>
-          </View>
+          </TouchableOpacity>
+        ) : hasDraft ? (
+          <TouchableOpacity style={styles.listRowInProgressButton} onPress={() => handleStartFromList(exercise)} activeOpacity={0.8}>
+            <Text style={styles.listRowInProgressText}>Continue</Text>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={styles.listRowStartButton}
@@ -951,7 +1004,7 @@ export default function ExerciseDeckScreen() {
         )}
       </View>
     );
-  }, [getDeckExerciseData, handleStartFromList]);
+  }, [getDeckExerciseData, handleStartFromList, draftSets]);
 
   // Render Add Exercise row and Favorites header at top of list
   const renderListHeader = useCallback(() => (
@@ -1146,6 +1199,19 @@ export default function ExerciseDeckScreen() {
       <ExerciseLogPopup
         visible={logPopupVisible}
         exercise={logPopupExercise}
+        initialSets={logPopupExercise ? draftSets.get(logPopupExercise.id) : undefined}
+        isEditing={
+          logPopupExercise
+            ? deckExercises.some(d => d.exercise.id === logPopupExercise.id && d.isCompleted)
+            : false
+        }
+        onDraftSave={(sets) => {
+          if (logPopupExercise) {
+            setDraftSets(prev => new Map(prev).set(logPopupExercise.id, sets));
+          }
+          setLogPopupVisible(false);
+          setLogPopupExercise(null);
+        }}
         onClose={() => {
           setLogPopupVisible(false);
           setLogPopupExercise(null);
@@ -1610,6 +1676,19 @@ const styles = StyleSheet.create({
   },
   listRowCompletedText: {
     color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  listRowInProgressButton: {
+    backgroundColor: colors.bgTertiary,
+    borderWidth: 1,
+    borderColor: colors.accentLight,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  listRowInProgressText: {
+    color: colors.accentLight,
     fontSize: 13,
     fontWeight: '600',
   },

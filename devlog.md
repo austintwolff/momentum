@@ -259,3 +259,29 @@
 **Concepts:** Dead code identification, multiple UI paths in codebase, dumbbell weight display vs storage (per-hand vs total), Metro bundler cache clearing, debugging stale bundles
 
 ---
+
+---
+## [14:30] Superset support, draft persistence, and completed exercise sorting
+
+**What:** Added draft state management (Map<string, DetailedSet[]>) to deck.tsx so in-progress sets survive popup open/close cycles, enabling users to bounce between exercises (superset workflow). Made completed exercise badges tappable to reopen the popup pre-filled for editing. Added a "Continue" button state for exercises with drafts. Sorted completed exercises to bottom of each list section.
+
+**Why:** Three related UX problems — completed exercises cluttered the list, completed badges were dead-ends with no way to edit, and starting a new exercise discarded progress on the current one. All three block real-world superset training patterns.
+
+**Files:** app/workout/deck.tsx, components/workout/ExerciseLogPopup.tsx
+
+**Concepts:** Draft state pattern for multi-entity forms, superset UX in workout apps, completion-aware sorting, weight unit conversion (kg storage to lbs/per-hand display), three-state button UI (Start/Continue/Completed)
+
+---
+
+---
+## [09:15] Fix button label and exercise completion reliability
+
+**What:** Fixed two bugs: (1) ExerciseLogPopup showed "Update Exercise" for drafts instead of only for completed exercises — replaced internal `isEditing` derivation with an explicit prop controlled by the parent. (2) `handleFinishExerciseFromPopup` used stale closure `activeWorkout` inside setTimeout, causing `markExerciseCompleted` to fail for newly-added exercises — switched to `useWorkoutStore.getState()` for fresh state and lookup by exercise ID instead of array index.
+
+**Why:** Drafts have `initialSets` just like completed exercises, so the old heuristic was wrong. The stale closure bug meant simple logging (no detailed sets) silently failed to mark exercises completed because `activeWorkout.exercises[index]` was undefined in the pre-mutation snapshot.
+
+**Files:** components/workout/ExerciseLogPopup.tsx, app/workout/deck.tsx
+
+**Concepts:** Zustand stale closure, getState() for fresh reads inside callbacks, prop-driven vs derived state, setTimeout closure capture
+
+---

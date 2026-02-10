@@ -94,7 +94,10 @@ export interface DetailedSet {
 interface ExerciseLogPopupProps {
   visible: boolean;
   exercise: Exercise | null;
+  initialSets?: DetailedSet[];
+  isEditing?: boolean; // true when exercise is already completed (not just a draft)
   onClose: () => void;
+  onDraftSave?: (sets: DetailedSet[]) => void;
   onFinish: (setCount: number, detailedSets?: DetailedSet[]) => void;
   weightUnit: 'lbs' | 'kg';
 }
@@ -102,7 +105,10 @@ interface ExerciseLogPopupProps {
 export default function ExerciseLogPopup({
   visible,
   exercise,
+  initialSets,
+  isEditing,
   onClose,
+  onDraftSave,
   onFinish,
   weightUnit,
 }: ExerciseLogPopupProps) {
@@ -120,10 +126,19 @@ export default function ExerciseLogPopup({
   // Initialize when popup opens
   useEffect(() => {
     if (visible && exercise) {
-      setSetCount(1);
-      setIsExpanded(false);
       setHistoricalData(null);
-      setDetailedSets([{ id: 'set-0', reps: '', weight: '', isComplete: false, isEdited: false }]);
+
+      if (initialSets && initialSets.length > 0) {
+        // Resume from draft or completed sets — start expanded
+        setDetailedSets(initialSets);
+        setSetCount(initialSets.length);
+        setIsExpanded(true);
+      } else {
+        // Fresh exercise
+        setSetCount(1);
+        setIsExpanded(false);
+        setDetailedSets([{ id: 'set-0', reps: '', weight: '', isComplete: false, isEdited: false }]);
+      }
 
       // Fetch historical data
       if (user?.id && exercise?.id) {
@@ -243,6 +258,15 @@ export default function ExerciseLogPopup({
     }
   };
 
+  const handleClose = () => {
+    // Save draft if user has expanded and entered data
+    if (onDraftSave && isExpanded && detailedSets.some(s => s.reps || s.weight)) {
+      onDraftSave(detailedSets);
+      return; // onDraftSave handles closing
+    }
+    onClose();
+  };
+
   const handleBackdropPress = () => {
     // Only dismiss keyboard, don't close popup (prevent accidental closes)
     Keyboard.dismiss();
@@ -258,7 +282,7 @@ export default function ExerciseLogPopup({
           <View style={styles.header}>
             <Text style={styles.title} numberOfLines={2}>{exercise.name}</Text>
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleClose}
               style={styles.closeButton}
               accessibilityLabel="Close"
             >
@@ -430,7 +454,7 @@ export default function ExerciseLogPopup({
             disabled={!allSetsComplete}
           >
             <Text style={[styles.finishButtonText, !allSetsComplete && styles.finishButtonTextDisabled]}>
-              Finish Exercise
+              {isEditing ? 'Update Exercise' : 'Finish Exercise'}
             </Text>
           </TouchableOpacity>
         </Pressable>
