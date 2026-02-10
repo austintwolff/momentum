@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { showAlert } from '@/lib/alert';
 import { colors } from '@/constants/Colors';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
-import { useSettingsStore } from '@/stores/settings.store';
+import { useSettingsStore, lbsToKg } from '@/stores/settings.store';
 import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet, getUserTopAndRecentExercises } from '@/services/workout.service';
 import { syncAndFetchExercises, clearExerciseCache } from '@/services/exercise-sync.service';
 import ExercisePicker from '@/components/workout/ExercisePicker';
@@ -24,6 +24,36 @@ import { Exercise } from '@/types/database';
 import { GoalBucket } from '@/lib/points-engine';
 import { getRecommendedExercises, getEquipmentType } from '@/services/recommendation.service';
 import { useWorkoutPreferencesStore } from '@/stores/workout-preferences.store';
+
+// Self-contained timer — isolates per-second re-renders from the parent
+function DeckTimer({ startedAt, elapsedRef }: { startedAt: Date; elapsedRef: React.MutableRefObject<number> }) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const e = Math.floor((Date.now() - startedAt.getTime()) / 1000);
+      setElapsed(e);
+      elapsedRef.current = e;
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startedAt]);
+
+  const hrs = Math.floor(elapsed / 3600);
+  const mins = Math.floor((elapsed % 3600) / 60);
+  const secs = elapsed % 60;
+  const formatted = hrs > 0
+    ? `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    : `${mins}:${secs.toString().padStart(2, '0')}`;
+
+  return <Text style={deckTimerStyle}>{formatted}</Text>;
+}
+
+const deckTimerStyle = {
+  fontSize: 36,
+  fontWeight: '800' as const,
+  color: colors.textPrimary,
+  fontVariant: ['tabular-nums' as const],
+};
 
 const DECK_LIMIT = 15; // Max exercises shown in deck view
 
@@ -161,17 +191,26 @@ export default function ExerciseDeckScreen() {
   // Always use dark theme
   const isDark = true;
 
-  const { user, profile, refreshUserStats } = useAuthStore();
-  const { weightUnit } = useSettingsStore();
-  const { activeWorkout, startWorkout, addExercise, cancelWorkout, endWorkout, markExerciseCompleted, saveSetsForExercise, logSimpleSets } = useWorkoutStore();
+  const user = useAuthStore(s => s.user);
+  const profile = useAuthStore(s => s.profile);
+  const refreshUserStats = useAuthStore(s => s.refreshUserStats);
+  const weightUnit = useSettingsStore(s => s.weightUnit);
+  const activeWorkout = useWorkoutStore(s => s.activeWorkout);
+  const startWorkout = useWorkoutStore(s => s.startWorkout);
+  const addExercise = useWorkoutStore(s => s.addExercise);
+  const cancelWorkout = useWorkoutStore(s => s.cancelWorkout);
+  const endWorkout = useWorkoutStore(s => s.endWorkout);
+  const markExerciseCompleted = useWorkoutStore(s => s.markExerciseCompleted);
+  const saveSetsForExercise = useWorkoutStore(s => s.saveSetsForExercise);
+  const logSimpleSets = useWorkoutStore(s => s.logSimpleSets);
 
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'deck' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [elapsedTime, setElapsedTime] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const elapsedRef = useRef(0);
 
   // Popup state for quick logging from list view
   const [logPopupVisible, setLogPopupVisible] = useState(false);
@@ -190,25 +229,12 @@ export default function ExerciseDeckScreen() {
 
   const flatListRef = useRef<FlatList>(null);
   const listViewRef = useRef<FlatList>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const workoutName = params.name || 'Workout';
   const goalMode = params.goal as 'Strength' | 'Hypertrophy' | 'Endurance' | undefined;
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Elapsed time timer
-  useEffect(() => {
-    if (activeWorkout) {
-      timerRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [activeWorkout]);
 
   // Get muscle groups for this workout type (defined early for use in handleExerciseComplete)
   const workoutMuscleGroups = useMemo(() => {
@@ -295,7 +321,7 @@ export default function ExerciseDeckScreen() {
   );
 
   // Get workout preferences
-  const { getExercisesForWorkout } = useWorkoutPreferencesStore();
+  const getExercisesForWorkout = useWorkoutPreferencesStore(s => s.getExercisesForWorkout);
 
   // Get workout type from workout name (e.g., "Push Day" -> "Push")
   const workoutType = useMemo(() => {
@@ -487,7 +513,7 @@ export default function ExerciseDeckScreen() {
                 goal: finishedWorkout.goal,
                 startedAt: finishedWorkout.startedAt,
                 completedAt,
-                durationSeconds: elapsedTime,
+                durationSeconds: elapsedRef.current,
                 exercises: finishedWorkout.exercises,
                 totalVolume: finishedWorkout.totalVolume,
                 weightUnit,
@@ -518,7 +544,7 @@ export default function ExerciseDeckScreen() {
                   totalSets: finishedWorkout.exercises
                     .reduce((sum, ex) => sum + ex.sets.length, 0)
                     .toString(),
-                  duration: elapsedTime.toString(),
+                  duration: elapsedRef.current.toString(),
                   exerciseCount: finishedWorkout.exercises
                     .filter(ex => ex.sets.length > 0)
                     .length.toString(),
@@ -530,7 +556,7 @@ export default function ExerciseDeckScreen() {
         },
       ]
     );
-  }, [activeWorkout, user, endWorkout, elapsedTime, weightUnit, refreshUserStats, router]);
+  }, [activeWorkout, user, endWorkout, weightUnit, refreshUserStats, router]);
 
   // Toggle between deck and list view, preserving position
   const handleToggleView = useCallback(() => {
@@ -797,16 +823,30 @@ export default function ExerciseDeckScreen() {
     setTimeout(() => {
       const currentDeckIndex = deckIndex === deckExercises.length ? deckIndex : deckIndex;
 
+      const exerciseIsDumbbell = logPopupExercise.equipment?.some(
+        (e: string) => e.toLowerCase() === 'dumbbell'
+      ) ?? false;
+
       if (detailedSets && detailedSets.some(s => s.reps || s.weight)) {
         // Detailed logging - convert DetailedSet[] to the format saveSetsForExercise expects
         const setsToSave = detailedSets
           .filter(s => s.reps || s.weight) // Only save sets with data
-          .map((s, i) => ({
-            id: s.id,
-            weight: s.weight ? parseFloat(s.weight) : null,
-            reps: parseInt(s.reps) || 0,
-            isWarmup: false,
-          }));
+          .map((s, i) => {
+            let weightKg: number | null = null;
+            if (s.weight) {
+              const parsed = parseFloat(s.weight);
+              // Convert from display unit to kg
+              const inKg = weightUnit === 'lbs' ? lbsToKg(parsed) : parsed;
+              // Double for dumbbells (user enters per-hand, we store total)
+              weightKg = exerciseIsDumbbell ? inKg * 2 : inKg;
+            }
+            return {
+              id: s.id,
+              weight: weightKg,
+              reps: parseInt(s.reps) || 0,
+              isWarmup: false,
+            };
+          });
 
         if (setsToSave.length > 0) {
           saveSetsForExercise({
@@ -955,17 +995,6 @@ export default function ExerciseDeckScreen() {
     </View>
   );
 
-  // Format elapsed time
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       {/* Top Bar */}
@@ -999,9 +1028,9 @@ export default function ExerciseDeckScreen() {
         <Text style={styles.timerLabel}>
           Duration
         </Text>
-        <Text style={styles.timerValue}>
-          {formatTime(elapsedTime)}
-        </Text>
+        {activeWorkout && (
+          <DeckTimer startedAt={activeWorkout.startedAt} elapsedRef={elapsedRef} />
+        )}
       </View>
 
       {/* Exercise Deck or List View */}

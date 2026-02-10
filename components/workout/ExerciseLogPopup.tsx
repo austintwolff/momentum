@@ -15,6 +15,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import { Exercise } from '@/types/database';
 import { getTopRecentSetsForExercise, RecentTopSet } from '@/services/workout.service';
 import { useAuthStore } from '@/stores/auth.store';
+import { kgToLbs } from '@/stores/settings.store';
 import { colors } from '@/constants/Colors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -105,14 +106,16 @@ export default function ExerciseLogPopup({
   onFinish,
   weightUnit,
 }: ExerciseLogPopupProps) {
-  const { user } = useAuthStore();
+  const user = useAuthStore(s => s.user);
   const [setCount, setSetCount] = useState(1);
   const [isExpanded, setIsExpanded] = useState(false);
   const [detailedSets, setDetailedSets] = useState<DetailedSet[]>([]);
   const [historicalData, setHistoricalData] = useState<RecentTopSet | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const prevValuesRef = useRef<{ [key: string]: string }>({});
 
   const isBodyweight = exercise?.exercise_type === 'bodyweight';
+  const isDumbbell = exercise?.equipment?.some(e => e.toLowerCase() === 'dumbbell') ?? false;
 
   // Initialize when popup opens
   useEffect(() => {
@@ -135,13 +138,20 @@ export default function ExerciseLogPopup({
     }
   }, [visible, exercise?.id, user?.id]);
 
+  // Convert historical weight (stored in kg) to display unit, halved for dumbbells
+  const getDisplayWeight = (weightKg: number): string => {
+    const inUnit = weightUnit === 'lbs' ? kgToLbs(weightKg) : weightKg;
+    const perHand = isDumbbell ? inUnit / 2 : inUnit;
+    return Math.round(perHand).toString();
+  };
+
   const handleExpand = () => {
     if (!isExpanded) {
       // Initialize rows with historical data when expanding
       const rows = Array.from({ length: setCount }, (_, i) => ({
         id: `set-${i}`,
         reps: historicalData?.reps.toString() || '',
-        weight: isBodyweight ? '' : (historicalData ? Math.round(historicalData.weight).toString() : ''),
+        weight: isBodyweight ? '' : (historicalData ? getDisplayWeight(historicalData.weight) : ''),
         isComplete: false,
         isEdited: false,
       }));
@@ -167,7 +177,7 @@ export default function ExerciseLogPopup({
     const newSet: DetailedSet = {
       id: `set-${detailedSets.length}`,
       reps: lastSet?.reps || historicalData?.reps.toString() || '',
-      weight: lastSet?.weight || (isBodyweight ? '' : (historicalData ? Math.round(historicalData.weight).toString() : '')),
+      weight: lastSet?.weight || (isBodyweight ? '' : (historicalData ? getDisplayWeight(historicalData.weight) : '')),
       isComplete: false,
       isEdited: false, // Not edited yet, so shows as placeholder style
     };
@@ -200,6 +210,24 @@ export default function ExerciseLogPopup({
     const newComplete = !updated[index].isComplete;
     updated[index] = { ...updated[index], isComplete: newComplete, isEdited: true };
     setDetailedSets(updated);
+  };
+
+  const handleInputFocus = (index: number, field: 'weight' | 'reps') => {
+    const key = `${index}-${field}`;
+    prevValuesRef.current[key] = detailedSets[index][field];
+    const updated = [...detailedSets];
+    updated[index] = { ...updated[index], [field]: '' };
+    setDetailedSets(updated);
+  };
+
+  const handleInputBlur = (index: number, field: 'weight' | 'reps') => {
+    const key = `${index}-${field}`;
+    if (!detailedSets[index][field] && prevValuesRef.current[key]) {
+      const updated = [...detailedSets];
+      updated[index] = { ...updated[index], [field]: prevValuesRef.current[key] };
+      setDetailedSets(updated);
+    }
+    delete prevValuesRef.current[key];
   };
 
   // Check if all sets are complete (only matters when expanded)
@@ -320,6 +348,8 @@ export default function ExerciseLogPopup({
                               returnKeyType="done"
                               value={set.weight}
                               onChangeText={(v) => handleUpdateSet(index, 'weight', v)}
+                              onFocus={() => handleInputFocus(index, 'weight')}
+                              onBlur={() => handleInputBlur(index, 'weight')}
                             />
                           </View>
                         )}
@@ -338,6 +368,8 @@ export default function ExerciseLogPopup({
                             returnKeyType="done"
                             value={set.reps}
                             onChangeText={(v) => handleUpdateSet(index, 'reps', v)}
+                            onFocus={() => handleInputFocus(index, 'reps')}
+                            onBlur={() => handleInputBlur(index, 'reps')}
                           />
                         </View>
 
@@ -359,7 +391,7 @@ export default function ExerciseLogPopup({
                               styles.inputLabel,
                               set.isComplete && styles.textSaved
                             ]}>
-                              Weight ({weightUnit})
+                              Weight ({weightUnit}){isDumbbell ? ' x2' : ''}
                             </Text>
                           </View>
                         )}
