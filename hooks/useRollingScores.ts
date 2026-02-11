@@ -9,15 +9,13 @@ import { useAuthStore } from '@/stores/auth.store';
  * Returns null values while loading or if not calibrated.
  */
 export function useRollingScores() {
-  const { user } = useAuthStore();
-  const {
-    scores,
-    breakdown,
-    isCalibrated,
-    isLoading,
-    error,
-    fetchScores,
-  } = useRollingScoresStore();
+  const user = useAuthStore(s => s.user);
+  const scores = useRollingScoresStore(s => s.scores);
+  const breakdown = useRollingScoresStore(s => s.breakdown);
+  const isCalibrated = useRollingScoresStore(s => s.isCalibrated);
+  const isLoading = useRollingScoresStore(s => s.isLoading);
+  const error = useRollingScoresStore(s => s.error);
+  const fetchScores = useRollingScoresStore(s => s.fetchScores);
 
   useEffect(() => {
     if (user?.id) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth.store';
 import { calculateOneRepMax } from '@/lib/points-engine';
@@ -193,180 +193,158 @@ function selectGoal<T extends { id: string; getGoal: (m: TodayMetrics) => DailyG
   return evaluatedGoals[index].goal;
 }
 
+const DEFAULT_METRICS: TodayMetrics = {
+  hasPR: false,
+  hasNearPR: false,
+  nearPRPercent: 0,
+  hasRepPR: false,
+  workingSets: 0,
+  totalVolumeKg: 0,
+  uniqueExercises: 0,
+  hasWorkout: false,
+  workedOutYesterday: false,
+  muscleGroupsHit: 0,
+};
+
+async function fetchDailyMetrics(userId: string): Promise<TodayMetrics> {
+  const now = new Date();
+
+  // Today's boundaries
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+
+  // Yesterday's boundaries
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const yesterdayEnd = new Date(todayStart);
+  yesterdayEnd.setMilliseconds(-1);
+
+  // Fetch today's and yesterday's workouts in parallel
+  const [todayWorkoutsRes, yesterdayWorkoutsRes] = await Promise.all([
+    (supabase as any)
+      .from('workout_sessions')
+      .select('id, completed_at')
+      .eq('user_id', userId)
+      .gte('completed_at', todayStart.toISOString())
+      .lte('completed_at', todayEnd.toISOString()),
+    (supabase as any)
+      .from('workout_sessions')
+      .select('id')
+      .eq('user_id', userId)
+      .gte('completed_at', yesterdayStart.toISOString())
+      .lte('completed_at', yesterdayEnd.toISOString())
+      .limit(1),
+  ]);
+
+  if (todayWorkoutsRes.error) {
+    console.error('[useDailyGoals] Error fetching today workouts:', todayWorkoutsRes.error);
+    return DEFAULT_METRICS;
+  }
+
+  const todayWorkouts = todayWorkoutsRes.data as Array<{ id: string; completed_at: string }> | null;
+  const yesterdayWorkouts = yesterdayWorkoutsRes.data as Array<{ id: string }> | null;
+
+  const hasWorkout = (todayWorkouts?.length ?? 0) > 0;
+  const workedOutYesterday = (yesterdayWorkouts?.length ?? 0) > 0;
+
+  if (!hasWorkout || !todayWorkouts?.length) {
+    return {
+      ...DEFAULT_METRICS,
+      workedOutYesterday,
+    };
+  }
+
+  const workoutIds = todayWorkouts.map((w) => w.id);
+
+  // Fetch sets with exercise info
+  const { data: sets, error: setsError } = await (supabase as any)
+    .from('workout_sets')
+    .select(`
+      id,
+      exercise_id,
+      set_type,
+      weight_kg,
+      reps,
+      is_pr,
+      exercise:exercises (
+        muscle_group
+      )
+    `)
+    .in('workout_session_id', workoutIds);
+
+  if (setsError) {
+    console.error('[useDailyGoals] Error fetching sets:', setsError);
+    return { ...DEFAULT_METRICS, hasWorkout: true, workedOutYesterday };
+  }
+
+  const setList = sets as Array<{
+    id: string;
+    exercise_id: string;
+    set_type: string;
+    weight_kg: number | null;
+    reps: number;
+    is_pr: boolean;
+    exercise: { muscle_group: string } | null;
+  }> | null;
+
+  // Calculate metrics
+  const workingSets = setList?.filter((s) => s.set_type !== 'warmup').length ?? 0;
+  const hasPR = setList?.some((s) => s.is_pr) ?? false;
+
+  // Calculate volume
+  const totalVolumeKg = setList?.reduce((sum, s) => {
+    if (s.set_type === 'warmup' || !s.weight_kg) return sum;
+    return sum + (s.weight_kg * s.reps);
+  }, 0) ?? 0;
+
+  // Count unique exercises
+  const exerciseIds = new Set(setList?.map((s) => s.exercise_id) ?? []);
+  const uniqueExercises = exerciseIds.size;
+
+  // Count muscle groups
+  const muscleGroups = new Set(
+    setList
+      ?.filter((s) => s.set_type !== 'warmup' && s.exercise?.muscle_group)
+      .map((s) => s.exercise!.muscle_group.toLowerCase()) ?? []
+  );
+  const muscleGroupsHit = muscleGroups.size;
+
+  // Check for near-PR and rep-PR (need to compare against baselines)
+  const { hasNearPR, nearPRPercent, hasRepPR } = await checkPRMetrics(
+    userId,
+    setList ?? [],
+    exerciseIds
+  );
+
+  return {
+    hasPR,
+    hasNearPR,
+    nearPRPercent,
+    hasRepPR,
+    workingSets,
+    totalVolumeKg,
+    uniqueExercises,
+    hasWorkout: true,
+    workedOutYesterday,
+    muscleGroupsHit,
+  };
+}
+
 /**
  * Hook to track today's progress for daily workout goals.
  * Shows one rotating goal per category based on smart selection logic.
  */
 export function useDailyGoals(): DailyGoalsResult {
-  const { user } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(true);
-  const [metrics, setMetrics] = useState<TodayMetrics>({
-    hasPR: false,
-    hasNearPR: false,
-    nearPRPercent: 0,
-    hasRepPR: false,
-    workingSets: 0,
-    totalVolumeKg: 0,
-    uniqueExercises: 0,
-    hasWorkout: false,
-    workedOutYesterday: false,
-    muscleGroupsHit: 0,
+  const user = useAuthStore(s => s.user);
+
+  const { data: metrics = DEFAULT_METRICS, isLoading } = useQuery({
+    queryKey: ['dailyGoals', user?.id],
+    queryFn: () => fetchDailyMetrics(user!.id),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
-
-  useEffect(() => {
-    if (!user?.id) {
-      setIsLoading(false);
-      return;
-    }
-
-    fetchTodayData(user.id);
-  }, [user?.id]);
-
-  async function fetchTodayData(userId: string) {
-    setIsLoading(true);
-
-    try {
-      const now = new Date();
-
-      // Today's boundaries
-      const todayStart = new Date(now);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(now);
-      todayEnd.setHours(23, 59, 59, 999);
-
-      // Yesterday's boundaries
-      const yesterdayStart = new Date(todayStart);
-      yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-      const yesterdayEnd = new Date(todayStart);
-      yesterdayEnd.setMilliseconds(-1);
-
-      // Fetch today's and yesterday's workouts in parallel
-      const [todayWorkoutsRes, yesterdayWorkoutsRes] = await Promise.all([
-        (supabase as any)
-          .from('workout_sessions')
-          .select('id, completed_at')
-          .eq('user_id', userId)
-          .gte('completed_at', todayStart.toISOString())
-          .lte('completed_at', todayEnd.toISOString()),
-        (supabase as any)
-          .from('workout_sessions')
-          .select('id')
-          .eq('user_id', userId)
-          .gte('completed_at', yesterdayStart.toISOString())
-          .lte('completed_at', yesterdayEnd.toISOString())
-          .limit(1),
-      ]);
-
-      if (todayWorkoutsRes.error) {
-        console.error('[useDailyGoals] Error fetching today workouts:', todayWorkoutsRes.error);
-        setIsLoading(false);
-        return;
-      }
-
-      const todayWorkouts = todayWorkoutsRes.data as Array<{ id: string; completed_at: string }> | null;
-      const yesterdayWorkouts = yesterdayWorkoutsRes.data as Array<{ id: string }> | null;
-
-      const hasWorkout = (todayWorkouts?.length ?? 0) > 0;
-      const workedOutYesterday = (yesterdayWorkouts?.length ?? 0) > 0;
-
-      if (!hasWorkout || !todayWorkouts?.length) {
-        setMetrics({
-          hasPR: false,
-          hasNearPR: false,
-          nearPRPercent: 0,
-          hasRepPR: false,
-          workingSets: 0,
-          totalVolumeKg: 0,
-          uniqueExercises: 0,
-          hasWorkout: false,
-          workedOutYesterday,
-          muscleGroupsHit: 0,
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      const workoutIds = todayWorkouts.map((w) => w.id);
-
-      // Fetch sets with exercise info
-      const { data: sets, error: setsError } = await (supabase as any)
-        .from('workout_sets')
-        .select(`
-          id,
-          exercise_id,
-          set_type,
-          weight_kg,
-          reps,
-          is_pr,
-          exercise:exercises (
-            muscle_group
-          )
-        `)
-        .in('workout_session_id', workoutIds);
-
-      if (setsError) {
-        console.error('[useDailyGoals] Error fetching sets:', setsError);
-        setIsLoading(false);
-        return;
-      }
-
-      const setList = sets as Array<{
-        id: string;
-        exercise_id: string;
-        set_type: string;
-        weight_kg: number | null;
-        reps: number;
-        is_pr: boolean;
-        exercise: { muscle_group: string } | null;
-      }> | null;
-
-      // Calculate metrics
-      const workingSets = setList?.filter((s) => s.set_type !== 'warmup').length ?? 0;
-      const hasPR = setList?.some((s) => s.is_pr) ?? false;
-
-      // Calculate volume
-      const totalVolumeKg = setList?.reduce((sum, s) => {
-        if (s.set_type === 'warmup' || !s.weight_kg) return sum;
-        return sum + (s.weight_kg * s.reps);
-      }, 0) ?? 0;
-
-      // Count unique exercises
-      const exerciseIds = new Set(setList?.map((s) => s.exercise_id) ?? []);
-      const uniqueExercises = exerciseIds.size;
-
-      // Count muscle groups
-      const muscleGroups = new Set(
-        setList
-          ?.filter((s) => s.set_type !== 'warmup' && s.exercise?.muscle_group)
-          .map((s) => s.exercise!.muscle_group.toLowerCase()) ?? []
-      );
-      const muscleGroupsHit = muscleGroups.size;
-
-      // Check for near-PR and rep-PR (need to compare against baselines)
-      const { hasNearPR, nearPRPercent, hasRepPR } = await checkPRMetrics(
-        userId,
-        setList ?? [],
-        exerciseIds
-      );
-
-      setMetrics({
-        hasPR,
-        hasNearPR,
-        nearPRPercent,
-        hasRepPR,
-        workingSets,
-        totalVolumeKg,
-        uniqueExercises,
-        hasWorkout: true,
-        workedOutYesterday,
-        muscleGroupsHit,
-      });
-    } catch (error) {
-      console.error('[useDailyGoals] Error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   // Select goals using smart logic
   const progressionGoal = selectGoal(PROGRESSION_GOALS, metrics, 'progression');
@@ -461,8 +439,6 @@ async function checkPRMetrics(
       const weightMap = bestRepsByWeightByExercise.get(set.exercise_id);
       if (weightMap) {
         const previousBestReps = weightMap.get(set.weight_kg) || 0;
-        // Rep PR = more reps than historical best at same weight (excluding today's contribution)
-        // Since historical includes today, we check if today's reps exceed what was previously recorded
         if (set.reps > previousBestReps) {
           hasRepPR = true;
         }

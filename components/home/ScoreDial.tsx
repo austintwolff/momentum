@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
@@ -10,7 +11,7 @@ interface ScoreDialProps {
   onPress?: () => void;
 }
 
-export function ScoreDial({ value, label, icon, size = 72, onPress }: ScoreDialProps) {
+export const ScoreDial = React.memo(function ScoreDial({ value, label, icon, size = 72, onPress }: ScoreDialProps) {
   const displayValue = value ?? 0; // Use 0 for arc calculations when null
   const strokeWidth = 3;
   const radius = (size - strokeWidth) / 2;
@@ -112,7 +113,7 @@ export function ScoreDial({ value, label, icon, size = 72, onPress }: ScoreDialP
   }
 
   return <View style={styles.container}>{dialContent}</View>;
-}
+});
 
 const styles = StyleSheet.create({
   container: {

@@ -105,8 +105,9 @@ interface WorkoutDetail {
 export default function WorkoutDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, refreshUserStats } = useAuthStore();
-  const { weightUnit } = useSettingsStore();
+  const user = useAuthStore(s => s.user);
+  const refreshUserStats = useAuthStore(s => s.refreshUserStats);
+  const weightUnit = useSettingsStore(s => s.weightUnit);
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);

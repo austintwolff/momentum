@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useQueryClient } from '@tanstack/react-query';
 import Svg, { Path, Rect, Circle } from 'react-native-svg';
 import { useAuthStore } from '@/stores/auth.store';
 import { useOnboardingStore } from '@/stores/onboarding.store';
@@ -10,8 +12,11 @@ import { ScoreDial } from '@/components/home/ScoreDial';
 import { WorkoutGoals } from '@/components/home/WorkoutGoals';
 import { TrainingFrequency } from '@/components/home/TrainingFrequency';
 import { useRollingScores } from '@/hooks/useRollingScores';
+import { useRollingScoresStore } from '@/stores/rolling-scores.store';
 import ScoreDetailPopup, { ScoreType } from '@/components/home/ScoreDetailPopup';
 import TutorialModal from '@/components/home/TutorialModal';
+import { fetchTopExercises } from '@/hooks/useTopExercises';
+import { fetchWorkoutTypeStats } from '@/hooks/useWorkoutTypeStats';
 
 // Custom SVG Icons for Dials
 function ProgressionIcon({ size = 18 }: { size?: number }) {
@@ -71,8 +76,13 @@ function InfoIcon({ size = 20 }: { size?: number }) {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { refreshUserStats } = useAuthStore();
-  const { hasSeenTutorial, setHasSeenTutorial } = useOnboardingStore();
+  const queryClient = useQueryClient();
+  const user = useAuthStore(s => s.user);
+  const userStats = useAuthStore(s => s.userStats);
+  const refreshUserStats = useAuthStore(s => s.refreshUserStats);
+  const hasSeenTutorial = useOnboardingStore(s => s.hasSeenTutorial);
+  const setHasSeenTutorial = useOnboardingStore(s => s.setHasSeenTutorial);
+  const fetchScores = useRollingScoresStore(s => s.fetchScores);
 
   // Rolling scores from 14-day window
   const { progression, load, consistency, breakdown } = useRollingScores();
@@ -83,6 +93,16 @@ export default function HomeScreen() {
 
   // Tutorial modal state
   const [tutorialVisible, setTutorialVisible] = useState(false);
+
+  // Wait for Zustand AsyncStorage hydration before evaluating tutorial flag
+  const [hydrated, setHydrated] = useState(
+    useOnboardingStore.persist.hasHydrated()
+  );
+
+  useEffect(() => {
+    const unsub = useOnboardingStore.persist.onFinishHydration(() => setHydrated(true));
+    return () => unsub();
+  }, []);
 
   const handleDialPress = (type: ScoreType) => {
     setSelectedScoreType(type);
@@ -102,17 +122,36 @@ export default function HomeScreen() {
     }
   };
 
-  // Refresh user stats when screen loads
-  useEffect(() => {
-    refreshUserStats();
-  }, []);
+  // Refresh data when home tab gains focus (e.g. after completing a workout)
+  // Also prefetch workout setup data so the "Start Workout" screen loads instantly
+  useFocusEffect(
+    useCallback(() => {
+      refreshUserStats();
+      if (user?.id) {
+        fetchScores(user.id);
+        // Prefetch data for workout setup screen
+        queryClient.prefetchQuery({
+          queryKey: ['topExercises', user.id],
+          queryFn: () => fetchTopExercises(user.id),
+          staleTime: 60 * 60 * 1000,
+        });
+        queryClient.prefetchQuery({
+          queryKey: ['workoutTypeStats', user.id],
+          queryFn: () => fetchWorkoutTypeStats(user.id),
+          staleTime: 60 * 60 * 1000,
+        });
+      }
+    }, [user?.id])
+  );
 
-  // Show tutorial on first open
+  // Show tutorial only for truly new users with no workout data
+  // Wait for hydration so hasSeenTutorial reflects the persisted value, not the default
   useEffect(() => {
-    if (!hasSeenTutorial) {
+    if (!hydrated) return;
+    if (!hasSeenTutorial && userStats && (userStats.total_workouts || 0) === 0) {
       setTutorialVisible(true);
     }
-  }, [hasSeenTutorial]);
+  }, [hasSeenTutorial, userStats, hydrated]);
 
   const handleTutorialClose = () => {
     setTutorialVisible(false);

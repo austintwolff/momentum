@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -40,7 +40,7 @@ interface AnimatedSetRowProps {
   onAnimationComplete?: () => void;
 }
 
-export default function AnimatedSetRow({
+function AnimatedSetRow({
   setNumber,
   weight,
   reps,
@@ -290,6 +290,8 @@ export default function AnimatedSetRow({
     </View>
   );
 }
+
+export default React.memo(AnimatedSetRow);
 
 const styles = StyleSheet.create({
   container: {

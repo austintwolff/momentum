@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Animated,
-  Modal,
-} from 'react-native';
+import { View, Text, StyleSheet, Modal } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  withSequence,
+  Easing,
+  SharedValue,
+} from 'react-native-reanimated';
 import { PointsResult } from '@/lib/points-engine/types';
 import { colors } from '@/constants/Colors';
 
@@ -75,22 +78,24 @@ export default function PointsAnimation({
   // Track current values for animation (to avoid stale state)
   const currentTotal = useRef(0);
   const currentMultiplier = useRef(1);
+  const animationCancelled = useRef(false);
 
-  const overlayOpacity = useRef(new Animated.Value(0)).current;
-  const contentScale = useRef(new Animated.Value(0.9)).current;
-  const baseCalcOpacity = useRef(new Animated.Value(0)).current;
-  const baseOpacity = useRef(new Animated.Value(0)).current;
-  const baseScale = useRef(new Animated.Value(0.8)).current;
-  const multiplierOpacity = useRef(new Animated.Value(0)).current;
-  const multiplierScale = useRef(new Animated.Value(1)).current;
-  const totalScale = useRef(new Animated.Value(1)).current;
-  const bonusAnimations = useRef<Animated.Value[]>([]).current;
+  // Reanimated shared values
+  const overlayOpacity = useSharedValue(0);
+  const contentScale = useSharedValue(0.9);
+  const baseCalcOpacity = useSharedValue(0);
+  const baseOpacity = useSharedValue(0);
+  const baseScale = useSharedValue(0.8);
+  const multiplierOpacity = useSharedValue(0);
+  const multiplierScale = useSharedValue(1);
+  const totalScale = useSharedValue(1);
 
   // Filter positive bonuses
   const positiveBonuses = pointsResult?.bonuses.filter(b => b.multiplier > 0) || [];
 
   useEffect(() => {
     if (visible && pointsResult) {
+      animationCancelled.current = false;
       runAnimation();
     } else {
       resetAnimation();
@@ -98,6 +103,7 @@ export default function PointsAnimation({
   }, [visible, pointsResult]);
 
   const resetAnimation = () => {
+    animationCancelled.current = true;
     setPhase('idle');
     setDisplayedTotal(0);
     setDisplayedMultiplier(1);
@@ -107,237 +113,19 @@ export default function PointsAnimation({
     setShowMultiplier(false);
     currentTotal.current = 0;
     currentMultiplier.current = 1;
-    overlayOpacity.setValue(0);
-    contentScale.setValue(0.9);
-    baseCalcOpacity.setValue(0);
-    baseOpacity.setValue(0);
-    baseScale.setValue(0.8);
-    multiplierOpacity.setValue(0);
-    multiplierScale.setValue(1);
-    totalScale.setValue(1);
-    bonusAnimations.length = 0;
+
+    overlayOpacity.value = 0;
+    contentScale.value = 0.9;
+    baseCalcOpacity.value = 0;
+    baseOpacity.value = 0;
+    baseScale.value = 0.8;
+    multiplierOpacity.value = 0;
+    multiplierScale.value = 1;
+    totalScale.value = 1;
   };
 
-  const runAnimation = async () => {
-    if (!pointsResult) return;
-
-    // Initialize bonus animations
-    positiveBonuses.forEach(() => {
-      bonusAnimations.push(new Animated.Value(0));
-    });
-
-    // === PHASE 1: Fade in overlay ===
-    setPhase('intro');
-    Animated.parallel([
-      Animated.timing(overlayOpacity, {
-        toValue: 1,
-        duration: 375,
-        useNativeDriver: true,
-      }),
-      Animated.spring(contentScale, {
-        toValue: 1,
-        friction: 8,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    await delay(625);
-
-    // === PHASE 2: Show base calculation formula ===
-    setPhase('base-calc');
-    setShowBaseCalc(true);
-
-    Animated.timing(baseCalcOpacity, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-
-    await delay(1250);
-
-    // === PHASE 3: Show base points result ===
-    setPhase('base');
-    setShowBase(true);
-
-    Animated.parallel([
-      Animated.timing(baseOpacity, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.spring(baseScale, {
-        toValue: 1,
-        friction: 6,
-        tension: 65,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    await delay(750);
-
-    // Count up total to base value
-    currentTotal.current = 0;
-    await countUp(
-      (val) => {
-        currentTotal.current = val;
-        setDisplayedTotal(val);
-      },
-      0,
-      pointsResult.basePoints,
-      1000
-    );
-
-    // Pulse total
-    pulseAnimation(totalScale);
-
-    await delay(1000);
-
-    // === PHASE 4: Show multiplier and bonuses ===
-    if (positiveBonuses.length > 0) {
-      setPhase('multiplier');
-      setShowMultiplier(true);
-      currentMultiplier.current = 1;
-      setDisplayedMultiplier(1);
-
-      // Fade out base section smoothly while fading in multiplier
-      Animated.parallel([
-        Animated.timing(baseCalcOpacity, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(baseOpacity, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(multiplierOpacity, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        // Hide base sections after fade completes
-        setShowBaseCalc(false);
-        setShowBase(false);
-      });
-
-      await delay(750);
-
-      // === PHASE 5: Each bonus flies in and applies ===
-      for (let i = 0; i < positiveBonuses.length; i++) {
-        const bonus = positiveBonuses[i];
-        setPhase(`bonus-${i}`);
-        setCurrentBonusIndex(i);
-
-        // Bonus flies in
-        Animated.spring(bonusAnimations[i], {
-          toValue: 1,
-          friction: 6,
-          tension: 50,
-          useNativeDriver: true,
-        }).start();
-
-        await delay(1250);
-
-        // Update multiplier
-        const prevMultiplier = currentMultiplier.current;
-        const newMultiplier = prevMultiplier + bonus.multiplier;
-
-        await countUp(
-          (val) => {
-            currentMultiplier.current = val;
-            setDisplayedMultiplier(val);
-          },
-          prevMultiplier,
-          newMultiplier,
-          750
-        );
-
-        // Pulse multiplier
-        pulseAnimation(multiplierScale);
-
-        await delay(625);
-
-        // Calculate and animate new total
-        const prevTotal = currentTotal.current;
-        const newTotal = Math.round(pointsResult.basePoints * newMultiplier);
-
-        await countUp(
-          (val) => {
-            currentTotal.current = val;
-            setDisplayedTotal(val);
-          },
-          prevTotal,
-          newTotal,
-          875
-        );
-
-        // Pulse total
-        pulseAnimation(totalScale);
-
-        await delay(875);
-      }
-    }
-
-    // === PHASE 6: Final emphasis ===
-    setPhase('final');
-
-    // Ensure we're at final points
-    if (Math.round(currentTotal.current) !== pointsResult.finalPoints) {
-      await countUp(
-        (val) => {
-          currentTotal.current = val;
-          setDisplayedTotal(val);
-        },
-        currentTotal.current,
-        pointsResult.finalPoints,
-        500
-      );
-    }
-
-    // Big final pulse
-    Animated.sequence([
-      Animated.timing(totalScale, {
-        toValue: 1.3,
-        duration: 310,
-        useNativeDriver: true,
-      }),
-      Animated.spring(totalScale, {
-        toValue: 1,
-        friction: 3,
-        tension: 50,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    await delay(1875);
-
-    // === PHASE 7: Fade out ===
-    setPhase('done');
-    Animated.timing(overlayOpacity, {
-      toValue: 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start(() => {
-      onComplete();
-    });
-  };
-
-  const pulseAnimation = (animValue: Animated.Value) => {
-    Animated.sequence([
-      Animated.timing(animValue, {
-        toValue: 1.25,
-        duration: 190,
-        useNativeDriver: true,
-      }),
-      Animated.timing(animValue, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const delay = (ms: number): Promise<void> => {
+    return new Promise(resolve => setTimeout(resolve, ms));
   };
 
   const countUp = (
@@ -351,6 +139,10 @@ export default function PointsAnimation({
       const diff = to - from;
 
       const tick = () => {
+        if (animationCancelled.current) {
+          resolve();
+          return;
+        }
         const elapsed = Date.now() - startTime;
         const progress = Math.min(elapsed / duration, 1);
 
@@ -372,9 +164,202 @@ export default function PointsAnimation({
     });
   };
 
-  const delay = (ms: number): Promise<void> => {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  const pulseAnimation = (animValue: SharedValue<number>) => {
+    animValue.value = withSequence(
+      withTiming(1.25, { duration: 190, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: 250, easing: Easing.in(Easing.quad) })
+    );
   };
+
+  const runAnimation = async () => {
+    if (!pointsResult) return;
+
+    // === PHASE 1: Fade in overlay ===
+    setPhase('intro');
+    overlayOpacity.value = withTiming(1, { duration: 375 });
+    contentScale.value = withSpring(1, { damping: 12, stiffness: 100 });
+
+    await delay(625);
+    if (animationCancelled.current) return;
+
+    // === PHASE 2: Show base calculation formula ===
+    setPhase('base-calc');
+    setShowBaseCalc(true);
+    baseCalcOpacity.value = withTiming(1, { duration: 500 });
+
+    await delay(1250);
+    if (animationCancelled.current) return;
+
+    // === PHASE 3: Show base points result ===
+    setPhase('base');
+    setShowBase(true);
+    baseOpacity.value = withTiming(1, { duration: 500 });
+    baseScale.value = withSpring(1, { damping: 10, stiffness: 120 });
+
+    await delay(750);
+    if (animationCancelled.current) return;
+
+    // Count up total to base value
+    currentTotal.current = 0;
+    await countUp(
+      (val) => {
+        currentTotal.current = val;
+        setDisplayedTotal(val);
+      },
+      0,
+      pointsResult.basePoints,
+      1000
+    );
+    if (animationCancelled.current) return;
+
+    // Pulse total
+    pulseAnimation(totalScale);
+
+    await delay(1000);
+    if (animationCancelled.current) return;
+
+    // === PHASE 4: Show multiplier and bonuses ===
+    if (positiveBonuses.length > 0) {
+      setPhase('multiplier');
+      setShowMultiplier(true);
+      currentMultiplier.current = 1;
+      setDisplayedMultiplier(1);
+
+      // Fade out base section smoothly while fading in multiplier
+      baseCalcOpacity.value = withTiming(0, { duration: 400 });
+      baseOpacity.value = withTiming(0, { duration: 400 });
+      multiplierOpacity.value = withTiming(1, { duration: 500 });
+
+      // Hide base sections after fade
+      setTimeout(() => {
+        setShowBaseCalc(false);
+        setShowBase(false);
+      }, 400);
+
+      await delay(750);
+      if (animationCancelled.current) return;
+
+      // === PHASE 5: Each bonus flies in and applies ===
+      for (let i = 0; i < positiveBonuses.length; i++) {
+        if (animationCancelled.current) return;
+
+        const bonus = positiveBonuses[i];
+        setPhase(`bonus-${i}`);
+        setCurrentBonusIndex(i);
+
+        await delay(1250);
+        if (animationCancelled.current) return;
+
+        // Update multiplier
+        const prevMultiplier = currentMultiplier.current;
+        const newMultiplier = prevMultiplier + bonus.multiplier;
+
+        await countUp(
+          (val) => {
+            currentMultiplier.current = val;
+            setDisplayedMultiplier(val);
+          },
+          prevMultiplier,
+          newMultiplier,
+          750
+        );
+        if (animationCancelled.current) return;
+
+        // Pulse multiplier
+        pulseAnimation(multiplierScale);
+
+        await delay(625);
+        if (animationCancelled.current) return;
+
+        // Calculate and animate new total
+        const prevTotal = currentTotal.current;
+        const newTotal = Math.round(pointsResult.basePoints * newMultiplier);
+
+        await countUp(
+          (val) => {
+            currentTotal.current = val;
+            setDisplayedTotal(val);
+          },
+          prevTotal,
+          newTotal,
+          875
+        );
+        if (animationCancelled.current) return;
+
+        // Pulse total
+        pulseAnimation(totalScale);
+
+        await delay(875);
+      }
+    }
+
+    if (animationCancelled.current) return;
+
+    // === PHASE 6: Final emphasis ===
+    setPhase('final');
+
+    // Ensure we're at final points
+    if (Math.round(currentTotal.current) !== pointsResult.finalPoints) {
+      await countUp(
+        (val) => {
+          currentTotal.current = val;
+          setDisplayedTotal(val);
+        },
+        currentTotal.current,
+        pointsResult.finalPoints,
+        500
+      );
+    }
+    if (animationCancelled.current) return;
+
+    // Big final pulse
+    totalScale.value = withSequence(
+      withTiming(1.3, { duration: 310, easing: Easing.out(Easing.quad) }),
+      withSpring(1, { damping: 5, stiffness: 100 })
+    );
+
+    await delay(1875);
+    if (animationCancelled.current) return;
+
+    // === PHASE 7: Fade out ===
+    setPhase('done');
+    overlayOpacity.value = withTiming(0, { duration: 500 });
+
+    await delay(500);
+    if (!animationCancelled.current) {
+      onComplete();
+    }
+  };
+
+  // Animated styles
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  const contentAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: contentScale.value }],
+  }));
+
+  const baseCalcAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: baseCalcOpacity.value,
+  }));
+
+  const baseAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: baseOpacity.value,
+    transform: [{ scale: baseScale.value }],
+  }));
+
+  const multiplierAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: multiplierOpacity.value,
+  }));
+
+  const multiplierInnerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: multiplierScale.value }],
+  }));
+
+  const totalAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: totalScale.value }],
+  }));
 
   if (!visible || !pointsResult) return null;
 
@@ -388,7 +373,6 @@ export default function PointsAnimation({
   };
 
   // Build base calculation string (volume = weight × reps)
-  // Weight is already in display units (what the user entered)
   const getBaseCalcString = () => {
     if (setInfo.isBodyweight) {
       return `bodyweight × ${setInfo.reps}`;
@@ -401,11 +385,11 @@ export default function PointsAnimation({
 
   return (
     <Modal transparent visible={visible} animationType="none">
-      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+      <Animated.View style={[styles.overlay, overlayAnimatedStyle]}>
         <Animated.View
           style={[
             styles.content,
-            { transform: [{ scale: contentScale }] },
+            contentAnimatedStyle,
           ]}
         >
           {/* Set Info Header */}
@@ -413,7 +397,7 @@ export default function PointsAnimation({
 
           {/* Base Calculation Formula */}
           {showBaseCalc && (
-            <Animated.View style={[styles.baseCalcSection, { opacity: baseCalcOpacity }]}>
+            <Animated.View style={[styles.baseCalcSection, baseCalcAnimatedStyle]}>
               <Text style={styles.baseCalcFormula}>{getBaseCalcString()}</Text>
             </Animated.View>
           )}
@@ -423,10 +407,7 @@ export default function PointsAnimation({
             <Animated.View
               style={[
                 styles.baseSection,
-                {
-                  opacity: baseOpacity,
-                  transform: [{ scale: baseScale }],
-                },
+                baseAnimatedStyle,
               ]}
             >
               <Text style={styles.baseEquals}>=</Text>
@@ -440,10 +421,10 @@ export default function PointsAnimation({
             <Animated.View
               style={[
                 styles.multiplierSection,
-                { opacity: multiplierOpacity },
+                multiplierAnimatedStyle,
               ]}
             >
-              <Animated.View style={[styles.multiplierInner, { transform: [{ scale: multiplierScale }] }]}>
+              <Animated.View style={[styles.multiplierInner, multiplierInnerAnimatedStyle]}>
                 <Text style={styles.multiplierX}>×</Text>
                 <Text style={styles.multiplierValue}>{formatPoints(displayedMultiplier)}</Text>
               </Animated.View>
@@ -462,37 +443,15 @@ export default function PointsAnimation({
                   description: bonus.description,
                   color: colors.accent,
                 };
-                const anim = bonusAnimations[index];
 
                 return (
-                  <Animated.View
+                  <BonusItem
                     key={`${bonus.type}-${index}`}
-                    style={[
-                      styles.bonusItem,
-                      {
-                        opacity: anim,
-                        transform: [
-                          {
-                            translateY: anim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [-20, 0],
-                            }),
-                          },
-                          { scale: anim },
-                        ],
-                      },
-                    ]}
-                  >
-                    <View style={[styles.bonusTag, { backgroundColor: info.color }]}>
-                      <Text style={styles.bonusTagText}>{info.label}</Text>
-                    </View>
-                    <View style={styles.bonusDetails}>
-                      <Text style={[styles.bonusPercent, { color: info.color }]}>
-                        +{Math.round(bonus.multiplier * 100)}%
-                      </Text>
-                      <Text style={styles.bonusDescription}>{info.description}</Text>
-                    </View>
-                  </Animated.View>
+                    label={info.label}
+                    description={info.description}
+                    color={info.color}
+                    multiplier={bonus.multiplier}
+                  />
                 );
               })}
             </View>
@@ -505,11 +464,11 @@ export default function PointsAnimation({
           <Animated.View
             style={[
               styles.totalSection,
-              { transform: [{ scale: totalScale }] },
+              totalAnimatedStyle,
             ]}
           >
             <Text style={[styles.totalLabel, isFinal && styles.totalLabelFinal]}>
-              {isFinal ? 'TOTAL' : 'TOTAL'}
+              TOTAL
             </Text>
             <Text style={[styles.totalValue, isFinal && styles.totalValueFinal]}>
               {formatPoints(displayedTotal)}
@@ -519,6 +478,47 @@ export default function PointsAnimation({
         </Animated.View>
       </Animated.View>
     </Modal>
+  );
+}
+
+// Extracted BonusItem with its own entry animation
+function BonusItem({
+  label,
+  description,
+  color,
+  multiplier,
+}: {
+  label: string;
+  description: string;
+  color: string;
+  multiplier: number;
+}) {
+  const animProgress = useSharedValue(0);
+
+  useEffect(() => {
+    animProgress.value = withSpring(1, { damping: 10, stiffness: 100 });
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: animProgress.value,
+    transform: [
+      { translateY: (1 - animProgress.value) * -20 },
+      { scale: animProgress.value },
+    ],
+  }));
+
+  return (
+    <Animated.View style={[styles.bonusItem, animatedStyle]}>
+      <View style={[styles.bonusTag, { backgroundColor: color }]}>
+        <Text style={styles.bonusTagText}>{label}</Text>
+      </View>
+      <View style={styles.bonusDetails}>
+        <Text style={[styles.bonusPercent, { color }]}>
+          +{Math.round(multiplier * 100)}%
+        </Text>
+        <Text style={styles.bonusDescription}>{description}</Text>
+      </View>
+    </Animated.View>
   );
 }
 

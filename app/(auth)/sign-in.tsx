@@ -18,7 +18,8 @@ import { colors } from '@/constants/Colors';
 export default function SignInScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn, isLoading } = useAuthStore();
+  const signIn = useAuthStore(s => s.signIn);
+  const isLoading = useAuthStore(s => s.isLoading);
 
   const handleSignIn = async () => {
     if (!email || !password) {

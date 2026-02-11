@@ -1,3 +1,4 @@
+import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { colors } from '@/constants/Colors';
 import { CalendarMode } from '@/hooks/useProgressCalendar';
@@ -34,7 +35,7 @@ function getPROpacity(e1rm: number): number {
   return 0.15 + normalized * 0.35;
 }
 
-export default function CalendarDayCell({
+function CalendarDayCell({
   day,
   value,
   isToday,
@@ -91,6 +92,8 @@ export default function CalendarDayCell({
     </TouchableOpacity>
   );
 }
+
+export default React.memo(CalendarDayCell);
 
 const CELL_SIZE = 44;
 

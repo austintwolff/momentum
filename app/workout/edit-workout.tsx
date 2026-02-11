@@ -124,13 +124,13 @@ export default function EditWorkoutScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; type?: string; isCustom?: string }>();
 
-  const { customWorkouts, removeCustomWorkout, updateCustomWorkout } = useCustomWorkoutStore();
-  const {
-    getExercisesForWorkout,
-    setExercisesForWorkout,
-    resetWorkoutToDefaults,
-    isWorkoutCustomized,
-  } = useWorkoutPreferencesStore();
+  const customWorkouts = useCustomWorkoutStore(s => s.customWorkouts);
+  const removeCustomWorkout = useCustomWorkoutStore(s => s.removeCustomWorkout);
+  const updateCustomWorkout = useCustomWorkoutStore(s => s.updateCustomWorkout);
+  const getExercisesForWorkout = useWorkoutPreferencesStore(s => s.getExercisesForWorkout);
+  const setExercisesForWorkout = useWorkoutPreferencesStore(s => s.setExercisesForWorkout);
+  const resetWorkoutToDefaults = useWorkoutPreferencesStore(s => s.resetWorkoutToDefaults);
+  const isWorkoutCustomized = useWorkoutPreferencesStore(s => s.isWorkoutCustomized);
 
   const isCustom = params.isCustom === 'true';
   const workoutId = params.id;

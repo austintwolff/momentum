@@ -63,7 +63,7 @@ interface UseProgressCalendarReturn {
 }
 
 export function useProgressCalendar(): UseProgressCalendarReturn {
-  const { user } = useAuthStore();
+  const user = useAuthStore(s => s.user);
   const [monthsData, setMonthsData] = useState<Map<string, MonthData>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<CalendarMode>('score');

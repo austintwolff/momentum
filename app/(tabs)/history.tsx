@@ -72,8 +72,8 @@ const PAGE_SIZE = 20;
 export default function HistoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
-  const { weightUnit } = useSettingsStore();
+  const user = useAuthStore(s => s.user);
+  const weightUnit = useSettingsStore(s => s.weightUnit);
 
   const [workouts, setWorkouts] = useState<WorkoutItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);

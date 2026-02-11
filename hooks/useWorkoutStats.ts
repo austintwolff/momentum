@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth.store';
 
@@ -76,94 +76,90 @@ function calculateStreak(workoutDates: Date[]): number {
   return streak;
 }
 
+interface WorkoutStatsData {
+  workoutsThisWeek: number;
+  weeklyWorkoutDays: boolean[];
+  streak: number;
+  avgScore: number;
+}
+
+async function fetchWorkoutStats(userId: string): Promise<WorkoutStatsData> {
+  const weekStart = getWeekStartMonday();
+  const sixtyDaysAgo = new Date();
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+  // Single query: fetch last 60 days for both streak and weekly stats
+  const { data: allWorkouts, error } = await (supabase
+    .from('workout_sessions') as any)
+    .select('completed_at, final_score')
+    .eq('user_id', userId)
+    .gte('completed_at', sixtyDaysAgo.toISOString())
+    .order('completed_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching workouts:', error);
+  }
+
+  // Calculate which days of the week had workouts (Mon=0, Sun=6)
+  const weeklyWorkoutDays = [false, false, false, false, false, false, false];
+  const workoutDatesThisWeek: Date[] = [];
+  const scores: number[] = [];
+  const allWorkoutDates: Date[] = [];
+
+  if (allWorkouts) {
+    allWorkouts.forEach((workout: { completed_at: string; final_score: number | null }) => {
+      const date = new Date(workout.completed_at);
+      allWorkoutDates.push(date);
+
+      // Check if this workout is from the current week
+      if (date >= weekStart) {
+        workoutDatesThisWeek.push(date);
+
+        let dayIndex = date.getDay() - 1; // Convert: Sun=0 -> Mon=0
+        if (dayIndex < 0) dayIndex = 6; // Sunday becomes 6
+        weeklyWorkoutDays[dayIndex] = true;
+
+        if (workout.final_score != null) {
+          scores.push(workout.final_score);
+        }
+      }
+    });
+  }
+
+  // Calculate average score
+  const avgScore = scores.length > 0
+    ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length)
+    : 0;
+
+  const streak = calculateStreak(allWorkoutDates);
+
+  return {
+    workoutsThisWeek: workoutDatesThisWeek.length,
+    weeklyWorkoutDays,
+    streak,
+    avgScore,
+  };
+}
+
+const DEFAULT_STATS: WorkoutStatsData = {
+  workoutsThisWeek: 0,
+  weeklyWorkoutDays: [false, false, false, false, false, false, false],
+  streak: 0,
+  avgScore: 0,
+};
+
 export function useWorkoutStats(): WorkoutStats {
-  const { user } = useAuthStore();
-  const [stats, setStats] = useState<WorkoutStats>({
-    workoutsThisWeek: 0,
-    weeklyWorkoutDays: [false, false, false, false, false, false, false],
-    streak: 0,
-    avgScore: 0,
-    isLoading: true,
+  const user = useAuthStore(s => s.user);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['workoutStats', user?.id],
+    queryFn: () => fetchWorkoutStats(user!.id),
+    enabled: !!user?.id,
+    staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
-  const fetchStats = useCallback(async () => {
-    if (!user) {
-      setStats({
-        workoutsThisWeek: 0,
-        weeklyWorkoutDays: [false, false, false, false, false, false, false],
-        streak: 0,
-        avgScore: 0,
-        isLoading: false,
-      });
-      return;
-    }
-
-    try {
-      const weekStart = getWeekStartMonday();
-      const sixtyDaysAgo = new Date();
-      sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-
-      // Single query: fetch last 60 days for both streak and weekly stats
-      const { data: allWorkouts, error } = await (supabase
-        .from('workout_sessions') as any)
-        .select('completed_at, final_score')
-        .eq('user_id', user.id)
-        .gte('completed_at', sixtyDaysAgo.toISOString())
-        .order('completed_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching workouts:', error);
-      }
-
-      // Calculate which days of the week had workouts (Mon=0, Sun=6)
-      const weeklyWorkoutDays = [false, false, false, false, false, false, false];
-      const workoutDatesThisWeek: Date[] = [];
-      const scores: number[] = [];
-      const allWorkoutDates: Date[] = [];
-
-      if (allWorkouts) {
-        allWorkouts.forEach((workout: { completed_at: string; final_score: number | null }) => {
-          const date = new Date(workout.completed_at);
-          allWorkoutDates.push(date);
-
-          // Check if this workout is from the current week
-          if (date >= weekStart) {
-            workoutDatesThisWeek.push(date);
-
-            let dayIndex = date.getDay() - 1; // Convert: Sun=0 -> Mon=0
-            if (dayIndex < 0) dayIndex = 6; // Sunday becomes 6
-            weeklyWorkoutDays[dayIndex] = true;
-
-            if (workout.final_score != null) {
-              scores.push(workout.final_score);
-            }
-          }
-        });
-      }
-
-      // Calculate average score
-      const avgScore = scores.length > 0
-        ? Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length)
-        : 0;
-
-      const streak = calculateStreak(allWorkoutDates);
-
-      setStats({
-        workoutsThisWeek: workoutDatesThisWeek.length,
-        weeklyWorkoutDays,
-        streak,
-        avgScore,
-        isLoading: false,
-      });
-    } catch (error) {
-      console.error('Error in useWorkoutStats:', error);
-      setStats(prev => ({ ...prev, isLoading: false }));
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
-  return stats;
+  return {
+    ...(data ?? DEFAULT_STATS),
+    isLoading,
+  };
 }

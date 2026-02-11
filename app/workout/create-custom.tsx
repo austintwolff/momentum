@@ -86,7 +86,7 @@ function getExercisesByMuscle(): Record<string, string[]> {
 
 export default function CreateCustomWorkoutScreen() {
   const router = useRouter();
-  const { addCustomWorkout } = useCustomWorkoutStore();
+  const addCustomWorkout = useCustomWorkoutStore(s => s.addCustomWorkout);
 
   const [workoutName, setWorkoutName] = useState('');
   const [selectedMuscles, setSelectedMuscles] = useState<string[]>([]);

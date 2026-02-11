@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import Svg, { Path, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { colors } from '@/constants/Colors';
 import { useCustomWorkoutStore } from '@/stores/custom-workout.store';
 import { useWorkoutTypeStats } from '@/hooks/useWorkoutTypeStats';
@@ -46,32 +46,6 @@ function PlusIcon({ size = 20, color = colors.accent }: { size?: number; color?:
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path d="M12 5V19" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
       <Path d="M5 12H19" stroke={color} strokeWidth={2.5} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function CheckboxIcon({ checked, size = 20 }: { checked: boolean; size?: number }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect
-        x="3"
-        y="3"
-        width="18"
-        height="18"
-        rx="4"
-        stroke={checked ? colors.accent : colors.textMuted}
-        strokeWidth={2}
-        fill={checked ? colors.accent : 'transparent'}
-      />
-      {checked && (
-        <Path
-          d="M7 12L10.5 15.5L17 9"
-          stroke={colors.textPrimary}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      )}
     </Svg>
   );
 }
@@ -147,17 +121,14 @@ const GOAL_MODES: { mode: GoalMode; reps: string }[] = [
 
 export default function NewWorkoutScreen() {
   const router = useRouter();
-  const { customWorkouts } = useCustomWorkoutStore();
+  const customWorkouts = useCustomWorkoutStore(s => s.customWorkouts);
   const { stats, getRecommendedType } = useWorkoutTypeStats();
-  const { exercisesByType } = useTopExercises();
-  const { weightUnit } = useSettingsStore();
+  const { exercisesByType, isLoading: exercisesLoading } = useTopExercises();
+  const weightUnit = useSettingsStore(s => s.weightUnit);
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedGoal, setSelectedGoal] = useState<GoalMode | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [addCore, setAddCore] = useState(false);
-  const [addCardio, setAddCardio] = useState(false);
-
   const flatListRef = useRef<FlatList>(null);
   const isInitialized = useRef(false);
 
@@ -173,18 +144,27 @@ export default function NewWorkoutScreen() {
     return [...DEFAULT_WORKOUT_TYPES, ...customCards];
   }, [customWorkouts]);
 
-  // Reorder so recommended is first
+  // Reorder so recommended is first, but lock order after first computation
+  const lockedOrderRef = useRef<WorkoutTypeCard[] | null>(null);
   const orderedWorkoutTypes = useMemo(() => {
+    // Once we've computed a non-trivial order, lock it so async stats updates
+    // don't cause card reordering and FlatList re-renders
+    if (lockedOrderRef.current) return lockedOrderRef.current;
+
     const recommended = getRecommendedType();
     if (!recommended) return allWorkoutTypes;
 
     const recommendedIndex = allWorkoutTypes.findIndex(w => w.type === recommended);
-    if (recommendedIndex <= 0) return allWorkoutTypes;
+    if (recommendedIndex <= 0) {
+      lockedOrderRef.current = allWorkoutTypes;
+      return allWorkoutTypes;
+    }
 
     // Move recommended to front
     const reordered = [...allWorkoutTypes];
     const [item] = reordered.splice(recommendedIndex, 1);
     reordered.unshift(item);
+    lockedOrderRef.current = reordered;
     return reordered;
   }, [allWorkoutTypes, getRecommendedType]);
 
@@ -216,8 +196,6 @@ export default function NewWorkoutScreen() {
       name: workoutName,
       goal: selectedGoal!,
     });
-    if (addCore) params.append('addCore', 'true');
-    if (addCardio) params.append('addCardio', 'true');
 
     router.replace(`/workout/deck?${params.toString()}`);
   };
@@ -284,6 +262,7 @@ export default function NewWorkoutScreen() {
     const typeStats = stats[item.type];
     const lastScore = typeStats?.lastScore;
     const topExercises = exercisesByType[item.type] || [];
+    const showSkeleton = exercisesLoading && topExercises.length === 0;
 
     return (
       <TouchableOpacity
@@ -345,7 +324,15 @@ export default function NewWorkoutScreen() {
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
           >
-            {topExercises.length > 0 ? (
+            {showSkeleton ? (
+              // Shimmer placeholder rows while loading
+              Array.from({ length: 5 }).map((_, i) => (
+                <View key={`skeleton-${i}`} style={styles.exerciseRow}>
+                  <View style={[styles.skeletonBar, { width: 100 + (i % 3) * 30 }]} />
+                  <View style={[styles.skeletonBar, { width: 40 }]} />
+                </View>
+              ))
+            ) : topExercises.length > 0 ? (
               topExercises.map((exercise) => (
                 <View key={exercise.exerciseId} style={styles.exerciseRow}>
                   <Text style={styles.exerciseName} numberOfLines={1}>
@@ -365,7 +352,7 @@ export default function NewWorkoutScreen() {
         </View>
       </TouchableOpacity>
     );
-  }, [selectedType, stats, handleEditWorkout, exercisesByType, formatWeight]);
+  }, [selectedType, stats, handleEditWorkout, exercisesByType, exercisesLoading, formatWeight]);
 
   // Circular scroll - when reaching end, jump to beginning
   const handleScrollEnd = useCallback((event: any) => {
@@ -485,31 +472,6 @@ export default function NewWorkoutScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        {/* Add-on Options */}
-        <View style={styles.addOnRow}>
-          <TouchableOpacity
-            style={styles.addOnOption}
-            onPress={() => setAddCore(!addCore)}
-            activeOpacity={0.7}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: addCore }}
-          >
-            <CheckboxIcon checked={addCore} />
-            <Text style={styles.addOnText}>Add Core</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.addOnOption}
-            onPress={() => setAddCardio(!addCardio)}
-            activeOpacity={0.7}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: addCardio }}
-          >
-            <CheckboxIcon checked={addCardio} />
-            <Text style={styles.addOnText}>Add Cardio</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Start Button */}
         <TouchableOpacity
           style={[styles.startButton, !canStart && styles.startButtonDisabled]}
@@ -711,6 +673,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 60,
   },
+  skeletonBar: {
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: colors.bgTertiary,
+    opacity: 0.5,
+  },
 
   // Page Indicator
   pageIndicator: {
@@ -789,22 +757,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 20,
-    gap: 20,
-  },
-  addOnRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 24,
-  },
-  addOnOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  addOnText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.textSecondary,
   },
   startButton: {
     backgroundColor: colors.accent,

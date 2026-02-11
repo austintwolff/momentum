@@ -155,40 +155,43 @@ function MacroTracker<T extends number>({
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, userStats, signOut, updateProfile } = useAuthStore();
-  const { weightUnit, setWeightUnit } = useSettingsStore();
+  const profile = useAuthStore(s => s.profile);
+  const userStats = useAuthStore(s => s.userStats);
+  const signOut = useAuthStore(s => s.signOut);
+  const updateProfile = useAuthStore(s => s.updateProfile);
+  const weightUnit = useSettingsStore(s => s.weightUnit);
+  const setWeightUnit = useSettingsStore(s => s.setWeightUnit);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isMeasurementsModalVisible, setIsMeasurementsModalVisible] = useState(false);
 
   // Measurements store
-  const { heightCm, weightKg, sex, updateMeasurements } = useMeasurementsStore();
+  const heightCm = useMeasurementsStore(s => s.heightCm);
+  const weightKg = useMeasurementsStore(s => s.weightKg);
+  const sex = useMeasurementsStore(s => s.sex);
+  const updateMeasurements = useMeasurementsStore(s => s.updateMeasurements);
 
   // Total sets hook
   const { totalSets } = useTotalSets();
 
   // Protein store
-  const {
-    currentProtein,
-    selectedIncrement: proteinIncrement,
-    addProtein,
-    subtractProtein,
-    setSelectedIncrement: setProteinIncrement,
-    setProteinGoal,
-    proteinGoal,
-    checkAndResetDaily: checkProteinReset,
-  } = useProteinStore();
+  const currentProtein = useProteinStore(s => s.currentProtein);
+  const proteinIncrement = useProteinStore(s => s.selectedIncrement);
+  const addProtein = useProteinStore(s => s.addProtein);
+  const subtractProtein = useProteinStore(s => s.subtractProtein);
+  const setProteinIncrement = useProteinStore(s => s.setSelectedIncrement);
+  const setProteinGoal = useProteinStore(s => s.setProteinGoal);
+  const proteinGoal = useProteinStore(s => s.proteinGoal);
+  const checkProteinReset = useProteinStore(s => s.checkAndResetDaily);
 
   // Calorie store
-  const {
-    currentCalories,
-    selectedIncrement: calorieIncrement,
-    addCalories,
-    subtractCalories,
-    setSelectedIncrement: setCalorieIncrement,
-    setCalorieGoal,
-    calorieGoal,
-    checkAndResetDaily: checkCalorieReset,
-  } = useCalorieStore();
+  const currentCalories = useCalorieStore(s => s.currentCalories);
+  const calorieIncrement = useCalorieStore(s => s.selectedIncrement);
+  const addCalories = useCalorieStore(s => s.addCalories);
+  const subtractCalories = useCalorieStore(s => s.subtractCalories);
+  const setCalorieIncrement = useCalorieStore(s => s.setSelectedIncrement);
+  const setCalorieGoal = useCalorieStore(s => s.setCalorieGoal);
+  const calorieGoal = useCalorieStore(s => s.calorieGoal);
+  const checkCalorieReset = useCalorieStore(s => s.checkAndResetDaily);
 
   // Reset daily trackers and update goals based on measurements
   useEffect(() => {

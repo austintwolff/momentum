@@ -21,7 +21,8 @@ export default function SignUpScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const { signUp, isLoading } = useAuthStore();
+  const signUp = useAuthStore(s => s.signUp);
+  const isLoading = useAuthStore(s => s.isLoading);
   const router = useRouter();
 
   const handleSignUp = async () => {

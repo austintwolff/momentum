@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
+  AppState,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
@@ -17,6 +18,45 @@ import { saveWorkoutToDatabase } from '@/services/workout.service';
 import { GoalBucket } from '@/lib/points-engine';
 import ExercisePicker from '@/components/workout/ExercisePicker';
 import { colors } from '@/constants/Colors';
+
+// Self-contained timer component — owns its own state so the parent doesn't re-render every second
+function WorkoutTimer({ startedAt, elapsedRef }: { startedAt: Date; elapsedRef: React.MutableRefObject<number> }) {
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      const elapsed = Math.floor(
+        (Date.now() - startedAt.getTime()) / 1000
+      );
+      setElapsedTime(elapsed);
+      elapsedRef.current = elapsed;
+    };
+
+    const interval = setInterval(update, 1000);
+
+    // When the app returns from background, force an immediate recalculation
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') update();
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, [startedAt]);
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return <Text style={styles.timer}>{formatTime(elapsedTime)}</Text>;
+}
 
 // Custom SVG Icons
 function CloseIcon({ size = 20 }: { size?: number }) {
@@ -76,20 +116,18 @@ export default function ActiveWorkoutScreen() {
   // Goal mode from setup screen (for future use)
   const goalMode = params.goal as 'Strength' | 'Hypertrophy' | 'Endurance' | undefined;
 
-  const { user, refreshUserStats } = useAuthStore();
-  const { weightUnit } = useSettingsStore();
-  const {
-    activeWorkout,
-    startWorkout,
-    endWorkout,
-    cancelWorkout,
-    addExercise,
-  } = useWorkoutStore();
+  const user = useAuthStore(s => s.user);
+  const refreshUserStats = useAuthStore(s => s.refreshUserStats);
+  const weightUnit = useSettingsStore(s => s.weightUnit);
+  const activeWorkout = useWorkoutStore(s => s.activeWorkout);
+  const startWorkout = useWorkoutStore(s => s.startWorkout);
+  const endWorkout = useWorkoutStore(s => s.endWorkout);
+  const cancelWorkout = useWorkoutStore(s => s.cancelWorkout);
+  const addExercise = useWorkoutStore(s => s.addExercise);
 
   const [showExercisePicker, setShowExercisePicker] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef(0);
 
   // Start workout on mount
   useEffect(() => {
@@ -98,32 +136,6 @@ export default function ActiveWorkoutScreen() {
       startWorkout(params.name || 'Workout', goal);
     }
   }, []);
-
-  // Elapsed time timer
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      if (activeWorkout) {
-        const elapsed = Math.floor(
-          (Date.now() - new Date(activeWorkout.startedAt).getTime()) / 1000
-        );
-        setElapsedTime(elapsed);
-      }
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [activeWorkout?.startedAt]);
-
-  const formatTime = (seconds: number) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    if (hrs > 0) {
-      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
 
   const handleFinishWorkout = () => {
     showAlert(
@@ -149,7 +161,7 @@ export default function ActiveWorkoutScreen() {
                 goal: finishedWorkout.goal,
                 startedAt: finishedWorkout.startedAt,
                 completedAt,
-                durationSeconds: elapsedTime,
+                durationSeconds: elapsedRef.current,
                 exercises: finishedWorkout.exercises,
                 totalVolume: finishedWorkout.totalVolume,
                 weightUnit,
@@ -180,7 +192,7 @@ export default function ActiveWorkoutScreen() {
                   totalSets: finishedWorkout.exercises
                     .reduce((sum, ex) => sum + ex.sets.length, 0)
                     .toString(),
-                  duration: elapsedTime.toString(),
+                  duration: elapsedRef.current.toString(),
                   exerciseCount: finishedWorkout.exercises.length.toString(),
                 },
               });
@@ -276,9 +288,7 @@ export default function ActiveWorkoutScreen() {
           <Text style={styles.workoutName}>
             {activeWorkout.name}
           </Text>
-          <Text style={styles.timer}>
-            {formatTime(elapsedTime)}
-          </Text>
+          <WorkoutTimer startedAt={activeWorkout.startedAt} elapsedRef={elapsedRef} />
         </View>
 
         <TouchableOpacity

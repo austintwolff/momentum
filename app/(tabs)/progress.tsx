@@ -26,7 +26,7 @@ function DumbbellIcon({ size = 32 }: { size?: number }) {
 export default function ProgressScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { weightUnit } = useSettingsStore();
+  const weightUnit = useSettingsStore(s => s.weightUnit);
 
   // Calendar data hook
   const {

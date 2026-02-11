@@ -70,20 +70,19 @@ export default function ExerciseDetailScreenV2() {
   const params = useLocalSearchParams<{ index: string }>();
   const exerciseIndex = parseInt(params.index || '0', 10);
 
-  const { user, profile } = useAuthStore();
-  const { weightUnit } = useSettingsStore();
+  const user = useAuthStore(s => s.user);
+  const profile = useAuthStore(s => s.profile);
+  const weightUnit = useSettingsStore(s => s.weightUnit);
   const weightIncrement = getWeightIncrement(weightUnit);
-  const {
-    activeWorkout,
-    isRestTimerActive,
-    restTimeRemaining,
-    setCurrentExercise,
-    saveSetsForExercise,
-    removeExercise,
-    startRestTimer,
-    stopRestTimer,
-    tickRestTimer,
-  } = useWorkoutStore();
+  const activeWorkout = useWorkoutStore(s => s.activeWorkout);
+  const isRestTimerActive = useWorkoutStore(s => s.isRestTimerActive);
+  const restTimeRemaining = useWorkoutStore(s => s.restTimeRemaining);
+  const setCurrentExercise = useWorkoutStore(s => s.setCurrentExercise);
+  const saveSetsForExercise = useWorkoutStore(s => s.saveSetsForExercise);
+  const removeExercise = useWorkoutStore(s => s.removeExercise);
+  const startRestTimer = useWorkoutStore(s => s.startRestTimer);
+  const stopRestTimer = useWorkoutStore(s => s.stopRestTimer);
+  const tickRestTimer = useWorkoutStore(s => s.tickRestTimer);
 
   const [localSets, setLocalSets] = useState<LocalSet[]>([]);
   const [historicalBestSet, setHistoricalBestSet] = useState<BestSetResult | null>(null);

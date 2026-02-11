@@ -42,7 +42,7 @@ export default function EditMeasurementsModal({
   currentSex,
 }: EditMeasurementsModalProps) {
   const insets = useSafeAreaInsets();
-  const { weightUnit } = useSettingsStore();
+  const weightUnit = useSettingsStore(s => s.weightUnit);
 
   // Height in feet/inches for imperial
   const [feet, setFeet] = useState('');

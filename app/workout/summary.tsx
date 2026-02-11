@@ -149,7 +149,7 @@ function getWorkoutsThisWeek(consistencyScore: number): number {
 
 export default function WorkoutSummaryScreen() {
   const router = useRouter();
-  const { weightUnit } = useSettingsStore();
+  const weightUnit = useSettingsStore(s => s.weightUnit);
   const params = useLocalSearchParams<{
     workoutScore: string;
     progressScore: string;

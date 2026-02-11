@@ -1,3 +1,4 @@
+import React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { colors } from '@/constants/Colors';
 import { CalendarMode, MonthData, DayData } from '@/hooks/useProgressCalendar';
@@ -33,7 +34,7 @@ function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
-export default function CalendarMonth({
+function CalendarMonth({
   year,
   month,
   data,
@@ -131,6 +132,8 @@ export default function CalendarMonth({
     </View>
   );
 }
+
+export default React.memo(CalendarMonth);
 
 const styles = StyleSheet.create({
   container: {
