@@ -285,3 +285,55 @@
 **Concepts:** Zustand stale closure, getState() for fresh reads inside callbacks, prop-driven vs derived state, setTimeout closure capture
 
 ---
+
+---
+## [14:30] Fix add-exercise-mid-workout bugs + custom exercise creation
+
+**What:** Fixed three issues: (1) exercises added mid-workout with non-matching muscle groups now appear in list view by re-adding deck exercises filtered out by muscle group, (2) `handleSelectExercise` now opens the log popup instead of trying to scroll a hidden FlatList, (3) exercise sync query now fetches user's private exercises alongside public ones using `.or()` filter.
+
+**Why:** Adding a Pull exercise during a Push workout was invisible because `organizedListExercises` filtered by workout muscle groups. The picker's post-add scroll targeted a deck FlatList that doesn't exist in list mode. Private exercises were excluded by a hard `.eq('is_public', true)` filter despite RLS allowing them.
+
+**Files:** app/workout/deck.tsx, services/exercise-sync.service.ts, components/workout/ExercisePicker.tsx
+
+**Concepts:** Supabase `.or()` filter composition, useMemo dependency-aware filtering, modal dismiss timing with setTimeout, inline form state management, custom exercise creation flow
+
+---
+
+---
+## [14:35] Add custom exercise creation feature to ExercisePicker
+
+**What:** Added `createCustomExercise` service function that inserts private exercises to the database, and built an inline creation form in ExercisePicker with name input, horizontal muscle group chips, weighted/bodyweight toggle, and Create & Add button. The form pre-fills with the search query and defaults muscle group to the workout type.
+
+**Why:** Users need to create exercises not in the app's built-in library. The inline form keeps users in-flow rather than navigating away, and the created exercise is immediately added to the workout with the log popup opening.
+
+**Files:** services/exercise-sync.service.ts, components/workout/ExercisePicker.tsx
+
+**Concepts:** Supabase RLS-compliant inserts, exercise cache invalidation, inline form UX patterns, ScrollView horizontal chip selectors, optimistic local state updates
+
+---
+
+---
+## [14:45] Hide already-added exercises from ExercisePicker
+
+**What:** Added `excludeExerciseIds` prop to ExercisePicker and passed the current deck exercise IDs from deck.tsx. The picker now filters out exercises already in the active workout.
+
+**Why:** Showing already-added exercises in the picker is confusing — users should only see exercises they haven't added yet.
+
+**Files:** components/workout/ExercisePicker.tsx, app/workout/deck.tsx
+
+**Concepts:** Prop-driven filtering, Set-based lookup for O(1) exclusion, useMemo dependency tracking
+
+---
+
+---
+## [15:20] Add custom exercise deletion
+
+**What:** Added `deleteCustomExercise` service function, a red trash icon in the top-left of ExerciseLogPopup (only for custom exercises), and a destructive confirmation alert. On delete, the exercise is removed from the database, the active workout, and local state.
+
+**Why:** Users need the ability to remove custom exercises they no longer want. The trash icon only appears for non-public exercises to prevent confusion with built-in exercises.
+
+**Files:** services/exercise-sync.service.ts, components/workout/ExerciseLogPopup.tsx, app/workout/deck.tsx
+
+**Concepts:** Conditional UI rendering based on data ownership, Alert.alert with destructive style, cascading state cleanup (DB + store + local), RLS-safe delete with is_public guard
+
+---

@@ -45,12 +45,22 @@ export async function syncAndFetchExercises(): Promise<Exercise[]> {
 
 async function performSync(): Promise<Exercise[]> {
   try {
+    // Get current user upfront (needed for both fetching private exercises and inserting)
+    const { data: { user } } = await supabase.auth.getUser();
+
     // 1. Fetch all existing exercises from database
-    const { data: existingExercises, error: fetchError } = await supabase
+    // Include public exercises AND user's own private exercises
+    let query = supabase
       .from('exercises')
-      .select('id, name, description, exercise_type, muscle_group, equipment, is_compound, is_public, created_by, created_at')
-      .eq('is_public', true)
-      .order('name');
+      .select('id, name, description, exercise_type, muscle_group, equipment, is_compound, is_public, created_by, created_at');
+
+    if (user) {
+      query = query.or(`is_public.eq.true,created_by.eq.${user.id}`);
+    } else {
+      query = query.eq('is_public', true);
+    }
+
+    const { data: existingExercises, error: fetchError } = await query.order('name');
 
     if (fetchError) {
       console.error('[ExerciseSync] Error fetching exercises:', fetchError);
@@ -71,9 +81,6 @@ async function performSync(): Promise<Exercise[]> {
 
     // 3. Insert missing exercises (requires authenticated user for RLS)
     if (exercisesToInsert.length > 0) {
-      // Get current user for RLS compliance
-      const { data: { user } } = await supabase.auth.getUser();
-
       if (!user) {
         console.warn('[ExerciseSync] No authenticated user, skipping insert');
         // Return what we have from database
@@ -179,4 +186,61 @@ export async function findExerciseByName(name: string): Promise<Exercise | null>
   const exercises = await syncAndFetchExercises();
   const nameLower = name.toLowerCase();
   return exercises.find(e => e.name.toLowerCase() === nameLower) || null;
+}
+
+/**
+ * Create a custom (private) exercise for the current user.
+ * Returns the created Exercise or null on failure.
+ */
+export async function createCustomExercise(params: {
+  name: string;
+  muscleGroup: string;
+  exerciseType: 'weighted' | 'bodyweight';
+  equipment?: string[];
+}): Promise<Exercise | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await (supabase
+    .from('exercises') as any)
+    .insert({
+      name: params.name,
+      exercise_type: params.exerciseType,
+      muscle_group: params.muscleGroup,
+      equipment: params.equipment || [],
+      is_compound: false,
+      is_public: false,
+      created_by: user.id,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[ExerciseSync] Error creating custom exercise:', error);
+    return null;
+  }
+
+  clearExerciseCache();
+  return data as Exercise;
+}
+
+/**
+ * Permanently delete a custom (private) exercise.
+ * Only the exercise creator can delete it (enforced by RLS).
+ * Returns true on success.
+ */
+export async function deleteCustomExercise(exerciseId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('exercises')
+    .delete()
+    .eq('id', exerciseId)
+    .eq('is_public', false);
+
+  if (error) {
+    console.error('[ExerciseSync] Error deleting custom exercise:', error);
+    return false;
+  }
+
+  clearExerciseCache();
+  return true;
 }

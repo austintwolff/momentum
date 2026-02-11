@@ -9,11 +9,13 @@ import {
   Modal,
   SafeAreaView,
   ActivityIndicator,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { MUSCLE_GROUPS } from '@/constants/exercises';
 import { Exercise } from '@/types/database';
-import { syncAndFetchExercises } from '@/services/exercise-sync.service';
+import { syncAndFetchExercises, createCustomExercise } from '@/services/exercise-sync.service';
 import { colors } from '@/constants/Colors';
 
 // Custom SVG Icons
@@ -42,6 +44,8 @@ function PlusCircleIcon({ size = 24 }: { size?: number }) {
   );
 }
 
+const EQUIPMENT_OPTIONS = ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'None'] as const;
+
 // Map workout types to relevant muscle groups
 const WORKOUT_MUSCLE_MAP: Record<string, string[]> = {
   'Push Day': ['Chest', 'Shoulders', 'Triceps'],
@@ -68,6 +72,7 @@ interface ExercisePickerProps {
   onClose: () => void;
   onSelectExercise: (exercise: Exercise) => void;
   workoutName?: string;
+  excludeExerciseIds?: string[];
 }
 
 export default function ExercisePicker({
@@ -75,12 +80,21 @@ export default function ExercisePicker({
   onClose,
   onSelectExercise,
   workoutName,
+  excludeExerciseIds,
 }: ExercisePickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   // 'workout' = workout-specific filter, null = all, string = specific muscle group
   const [selectedFilter, setSelectedFilter] = useState<'workout' | null | string>('workout');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [isLoadingExercises, setIsLoadingExercises] = useState(false);
+
+  // Custom exercise creation state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newMuscleGroup, setNewMuscleGroup] = useState<string>('');
+  const [newExerciseType, setNewExerciseType] = useState<'weighted' | 'bodyweight'>('weighted');
+  const [newEquipment, setNewEquipment] = useState<string>('');
+  const [isCreating, setIsCreating] = useState(false);
 
   // Get muscles for the current workout type
   const workoutMuscles = useMemo(() => {
@@ -94,11 +108,13 @@ export default function ExercisePicker({
     return [];
   }, [workoutName]);
 
-  // Reset filter when modal opens
+  // Reset filter and create form when modal opens
   useEffect(() => {
     if (visible) {
       setSelectedFilter(workoutMuscles.length > 0 ? 'workout' : null);
       setSearchQuery('');
+      setShowCreateForm(false);
+      setNewName('');
     }
   }, [visible, workoutMuscles.length]);
 
@@ -123,6 +139,11 @@ export default function ExercisePicker({
     }
   };
 
+  const excludeIds = useMemo(
+    () => new Set(excludeExerciseIds || []),
+    [excludeExerciseIds]
+  );
+
   const filteredExercises = useMemo(() => {
     const matchesMuscleFilter = (muscleGroup: string): boolean => {
       if (selectedFilter === null) return true; // All
@@ -135,18 +156,66 @@ export default function ExercisePicker({
     };
 
     return exercises.filter((exercise) => {
+      if (excludeIds.has(exercise.id)) return false;
       const matchesSearch = exercise.name
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
       const matchesMuscle = matchesMuscleFilter(exercise.muscle_group);
       return matchesSearch && matchesMuscle;
     });
-  }, [searchQuery, selectedFilter, workoutMuscles, exercises]);
+  }, [searchQuery, selectedFilter, workoutMuscles, exercises, excludeIds]);
 
   const handleSelectExercise = (exercise: Exercise) => {
     onSelectExercise(exercise);
     onClose();
     setSearchQuery('');
+  };
+
+  const handleOpenCreateForm = () => {
+    setNewName(searchQuery);
+    setNewMuscleGroup(workoutMuscles.length > 0 ? workoutMuscles[0] : MUSCLE_GROUPS[0]);
+    setNewExerciseType('weighted');
+    setNewEquipment('Barbell');
+    setShowCreateForm(true);
+  };
+
+  const handleCreateExercise = async () => {
+    const trimmedName = newName.trim();
+    if (!trimmedName) {
+      Alert.alert('Name Required', 'Please enter a name for the exercise.');
+      return;
+    }
+    if (!newMuscleGroup) {
+      Alert.alert('Muscle Group Required', 'Please select a muscle group.');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const created = await createCustomExercise({
+        name: trimmedName,
+        muscleGroup: newMuscleGroup,
+        exerciseType: newExerciseType,
+        equipment: newEquipment === 'None' ? [] : [newEquipment.toLowerCase()],
+      });
+
+      if (created) {
+        // Add to local exercises list so it appears immediately
+        setExercises(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+        // Close create form first, then let it dismiss before closing the picker
+        setShowCreateForm(false);
+        setTimeout(() => {
+          handleSelectExercise(created);
+        }, 300);
+      } else {
+        Alert.alert('Error', 'Failed to create exercise. Please try again.');
+      }
+    } catch (error) {
+      console.error('Failed to create custom exercise:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const renderExercise = ({ item }: { item: Exercise }) => {
@@ -175,6 +244,26 @@ export default function ExercisePicker({
         </View>
         <PlusCircleIcon />
       </TouchableOpacity>
+    );
+  };
+
+  const renderFooter = () => {
+    const isEmpty = filteredExercises.length === 0;
+
+    return (
+      <View style={isEmpty ? styles.emptyFooterWrapper : undefined}>
+        {isEmpty && !isLoadingExercises && (
+          <Text style={styles.emptyHint}>No exercises found</Text>
+        )}
+        <TouchableOpacity
+          style={styles.createFooterButton}
+          onPress={handleOpenCreateForm}
+          activeOpacity={0.7}
+        >
+          <PlusCircleIcon size={20} />
+          <Text style={styles.createFooterText}>Create Custom Exercise</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -254,12 +343,13 @@ export default function ExercisePicker({
           />
         </View>
 
-        {/* Exercise List - show exercises immediately, loading indicator is subtle */}
+        {/* Exercise List */}
         <FlatList
           data={filteredExercises}
           keyExtractor={(item) => item.id}
           renderItem={renderExercise}
           contentContainerStyle={styles.exerciseList}
+          keyboardShouldPersistTaps="handled"
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListHeaderComponent={
             isLoadingExercises ? (
@@ -271,16 +361,168 @@ export default function ExercisePicker({
               </View>
             ) : null
           }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🔍</Text>
-              <Text style={styles.emptyText}>
-                No exercises found
-              </Text>
-            </View>
-          }
+          ListFooterComponent={renderFooter}
         />
       </SafeAreaView>
+
+      {/* Create Custom Exercise Modal */}
+      <Modal
+        visible={showCreateForm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCreateForm(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCreateForm(false)}
+        >
+          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+            <Text style={styles.createFormTitle}>Create Custom Exercise</Text>
+
+            <View style={styles.createFieldGroup}>
+              <Text style={styles.createFormLabel}>Name</Text>
+              <TextInput
+                style={styles.createFormInput}
+                placeholder="e.g. Cable Fly"
+                placeholderTextColor={colors.textMuted}
+                value={newName}
+                onChangeText={setNewName}
+              />
+            </View>
+
+            <View style={styles.createFieldGroup}>
+              <Text style={styles.createFormLabel}>Muscle Group</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.createChipRow}
+              >
+                {MUSCLE_GROUPS.map((muscle) => {
+                  const isSelected = newMuscleGroup === muscle;
+                  return (
+                    <TouchableOpacity
+                      key={muscle}
+                      style={[
+                        styles.createChip,
+                        isSelected && styles.createChipActive,
+                      ]}
+                      onPress={() => setNewMuscleGroup(muscle)}
+                    >
+                      <Text
+                        style={[
+                          styles.createChipText,
+                          isSelected && styles.createChipTextActive,
+                        ]}
+                      >
+                        {muscle}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            <View style={styles.createFieldGroup}>
+              <Text style={styles.createFormLabel}>Type</Text>
+              <View style={styles.typeToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.typeToggleButton,
+                    newExerciseType === 'weighted' && styles.typeToggleActive,
+                  ]}
+                  onPress={() => {
+                    setNewExerciseType('weighted');
+                    if (newEquipment === 'None') setNewEquipment('Barbell');
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.typeToggleText,
+                      newExerciseType === 'weighted' && styles.typeToggleTextActive,
+                    ]}
+                  >
+                    Weighted
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.typeToggleButton,
+                    newExerciseType === 'bodyweight' && styles.typeToggleActive,
+                  ]}
+                  onPress={() => {
+                    setNewExerciseType('bodyweight');
+                    setNewEquipment('None');
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.typeToggleText,
+                      newExerciseType === 'bodyweight' && styles.typeToggleTextActive,
+                    ]}
+                  >
+                    Bodyweight
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {newExerciseType === 'weighted' && (
+              <View style={styles.createFieldGroup}>
+                <Text style={styles.createFormLabel}>Equipment</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.createChipRow}
+                >
+                  {EQUIPMENT_OPTIONS.filter(e => e !== 'None').map((equip) => {
+                    const isSelected = newEquipment === equip;
+                    return (
+                      <TouchableOpacity
+                        key={equip}
+                        style={[
+                          styles.createChip,
+                          isSelected && styles.createChipActive,
+                        ]}
+                        onPress={() => setNewEquipment(equip)}
+                      >
+                        <Text
+                          style={[
+                            styles.createChipText,
+                            isSelected && styles.createChipTextActive,
+                          ]}
+                        >
+                          {equip}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            <View style={styles.createFormActions}>
+              <TouchableOpacity
+                style={styles.createCancelButton}
+                onPress={() => setShowCreateForm(false)}
+              >
+                <Text style={styles.createCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.createSubmitButton, isCreating && styles.createSubmitDisabled]}
+                onPress={handleCreateExercise}
+                disabled={isCreating}
+              >
+                {isCreating ? (
+                  <ActivityIndicator size="small" color={colors.textPrimary} />
+                ) : (
+                  <Text style={styles.createSubmitText}>Create & Add</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </Modal>
   );
 }
@@ -358,7 +600,7 @@ const styles = StyleSheet.create({
   },
   exerciseList: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   exerciseItem: {
     flexDirection: 'row',
@@ -393,18 +635,6 @@ const styles = StyleSheet.create({
   separator: {
     height: 8,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIcon: {
-    fontSize: 48,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: 16,
-    color: colors.textSecondary,
-  },
   loadingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -415,5 +645,149 @@ const styles = StyleSheet.create({
   loadingBannerText: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+
+  // Empty state hint (inside footer when list is empty)
+  emptyFooterWrapper: {
+    alignItems: 'center',
+    paddingTop: 48,
+  },
+  emptyHint: {
+    fontSize: 15,
+    color: colors.textMuted,
+    marginBottom: 20,
+  },
+
+  // "Create Custom Exercise" trigger button
+  createFooterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.bgSecondary,
+  },
+  createFooterText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+
+  // Create form modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modalContent: {
+    padding: 24,
+    borderRadius: 20,
+    backgroundColor: colors.bgSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  createFormTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 20,
+  },
+  createFieldGroup: {
+    marginBottom: 16,
+  },
+  createFormInput: {
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    backgroundColor: colors.bgTertiary,
+    color: colors.textPrimary,
+  },
+  createFormLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  createChipRow: {
+    gap: 8,
+  },
+  createChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: colors.bgTertiary,
+  },
+  createChipActive: {
+    backgroundColor: colors.accent,
+  },
+  createChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  createChipTextActive: {
+    color: colors.textPrimary,
+  },
+  typeToggleRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  typeToggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: colors.bgTertiary,
+  },
+  typeToggleActive: {
+    backgroundColor: colors.accent,
+  },
+  typeToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  typeToggleTextActive: {
+    color: colors.textPrimary,
+  },
+  createFormActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  createCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: colors.bgTertiary,
+  },
+  createCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  createSubmitButton: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: colors.bgPrimary,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  createSubmitDisabled: {
+    opacity: 0.5,
+  },
+  createSubmitText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.accent,
   },
 });

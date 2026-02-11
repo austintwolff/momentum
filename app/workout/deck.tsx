@@ -10,6 +10,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
 import { showAlert } from '@/lib/alert';
 import { colors } from '@/constants/Colors';
@@ -17,7 +18,7 @@ import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore, lbsToKg, kgToLbs } from '@/stores/settings.store';
 import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet, getUserTopAndRecentExercises } from '@/services/workout.service';
-import { syncAndFetchExercises, clearExerciseCache } from '@/services/exercise-sync.service';
+import { syncAndFetchExercises, clearExerciseCache, deleteCustomExercise } from '@/services/exercise-sync.service';
 import ExercisePicker from '@/components/workout/ExercisePicker';
 import ExerciseLogPopup, { DetailedSet } from '@/components/workout/ExerciseLogPopup';
 import { Exercise } from '@/types/database';
@@ -191,6 +192,7 @@ export default function ExerciseDeckScreen() {
   // Always use dark theme
   const isDark = true;
 
+  const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
   const profile = useAuthStore(s => s.profile);
   const refreshUserStats = useAuthStore(s => s.refreshUserStats);
@@ -203,6 +205,7 @@ export default function ExerciseDeckScreen() {
   const markExerciseCompleted = useWorkoutStore(s => s.markExerciseCompleted);
   const saveSetsForExercise = useWorkoutStore(s => s.saveSetsForExercise);
   const logSimpleSets = useWorkoutStore(s => s.logSimpleSets);
+  const removeExercise = useWorkoutStore(s => s.removeExercise);
 
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
@@ -455,13 +458,12 @@ export default function ExerciseDeckScreen() {
   const handleSelectExercise = useCallback((exercise: Exercise) => {
     addExercise(exercise);
     setShowExercisePicker(false);
-    // Scroll to the new card
-    const newIndex = (activeWorkout?.exercises.length || 0);
+    // Open log popup after the picker modal fully dismisses
     setTimeout(() => {
-      flatListRef.current?.scrollToIndex({ index: newIndex, animated: true });
-      setCurrentIndex(newIndex);
-    }, 100);
-  }, [addExercise, activeWorkout?.exercises.length]);
+      setLogPopupExercise(exercise);
+      setLogPopupVisible(true);
+    }, 400);
+  }, [addExercise]);
 
   // Handle starting an exercise
   const handleStartExercise = useCallback((index: number) => {
@@ -525,6 +527,10 @@ export default function ExerciseDeckScreen() {
               if (!saveResult.success) {
                 console.error('Failed to save workout:', saveResult.error);
               }
+
+              // Invalidate cached queries so next workout setup shows fresh data
+              queryClient.invalidateQueries({ queryKey: ['topExercises'] });
+              queryClient.invalidateQueries({ queryKey: ['workoutTypeStats'] });
 
               await refreshUserStats();
 
@@ -610,6 +616,16 @@ export default function ExerciseDeckScreen() {
           ex.muscle_group.toLowerCase() === muscle.toLowerCase()
         )
       );
+
+      // Ensure exercises in the active workout always appear, even if muscle group doesn't match
+      const filteredIds = new Set(filtered.map(ex => ex.id));
+      const deckExerciseIds = new Set(deckExercises.map(item => item.exercise.id));
+      const missing = exercises.filter(
+        ex => deckExerciseIds.has(ex.id) && !filteredIds.has(ex.id)
+      );
+      if (missing.length > 0) {
+        filtered = [...filtered, ...missing];
+      }
     }
 
     // Apply search query if present
@@ -1193,6 +1209,7 @@ export default function ExerciseDeckScreen() {
         onClose={() => setShowExercisePicker(false)}
         onSelectExercise={handleSelectExercise}
         workoutName={workoutName}
+        excludeExerciseIds={deckExercises.map(item => item.exercise.id)}
       />
 
       {/* Exercise Log Popup for quick logging from list view */}
@@ -1217,6 +1234,15 @@ export default function ExerciseDeckScreen() {
           setLogPopupExercise(null);
         }}
         onFinish={handleFinishExerciseFromPopup}
+        onDelete={async (exerciseId) => {
+          const success = await deleteCustomExercise(exerciseId);
+          if (success) {
+            removeExercise(exerciseId);
+            setExercises(prev => prev.filter(ex => ex.id !== exerciseId));
+            setLogPopupVisible(false);
+            setLogPopupExercise(null);
+          }
+        }}
         weightUnit={weightUnit}
       />
     </SafeAreaView>
