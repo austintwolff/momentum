@@ -27,6 +27,7 @@ interface LocalSet {
   weight: string;
   reps: string;
   isWarmup: boolean;
+  isPR: boolean;
   isNew: boolean;
 }
 
@@ -108,13 +109,14 @@ export default function ExerciseDetailScreenV2() {
           weight: set.weight?.toString() || '',
           reps: set.reps.toString(),
           isWarmup: set.setType === 'warmup',
+          isPR: set.isPR,
           isNew: false,
         }))
       );
     } else {
       // Start with one empty row
       setLocalSets([
-        { id: uuidv4(), weight: '', reps: '', isWarmup: false, isNew: true },
+        { id: uuidv4(), weight: '', reps: '', isWarmup: false, isPR: false, isNew: true },
       ]);
     }
   }, [currentExercise?.id]);
@@ -159,7 +161,7 @@ export default function ExerciseDetailScreenV2() {
   const handleIncrementSets = () => {
     setLocalSets((prev) => [
       ...prev,
-      { id: uuidv4(), weight: '', reps: '', isWarmup: false, isNew: true },
+      { id: uuidv4(), weight: '', reps: '', isWarmup: false, isPR: false, isNew: true },
     ]);
   };
 
@@ -222,6 +224,7 @@ export default function ExerciseDetailScreenV2() {
         weight: lastSet.weight,
         reps: lastSet.reps,
         isWarmup: false,
+        isPR: false,
         isNew: true,
       },
     ]);
@@ -406,6 +409,7 @@ export default function ExerciseDetailScreenV2() {
                 weight={set.weight}
                 reps={set.reps}
                 isWarmup={set.isWarmup}
+                isPR={set.isPR}
                 isBodyweight={isBodyweight}
                 weightUnit={weightUnit}
                 weightIncrement={weightIncrement}

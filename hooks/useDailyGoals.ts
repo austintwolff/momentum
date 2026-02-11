@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { calculateOneRepMax } from '@/lib/points-engine';
 
 // Goal targets
-const TARGET_WORKING_SETS = 15;
+const TARGET_WORKING_SETS = 20;
 const TARGET_VOLUME_KG = 5000;
 const TARGET_EXERCISE_VARIETY = 5;
 const TARGET_MUSCLE_GROUPS = 3;

@@ -12,7 +12,7 @@ const MUSCLE_DISPLAY_NAMES: Record<string, string> = {
   'triceps': 'Triceps',
   'forearms': 'Forearms',
   'core': 'Core',
-  'quads': 'Quadriceps',
+  'quads': 'Quads',
   'hamstrings': 'Hamstrings',
   'glutes': 'Glutes',
   'calves': 'Calves',

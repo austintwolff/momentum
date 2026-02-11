@@ -54,6 +54,17 @@ const getDisplayName = (muscle: MuscleGroup): string => {
   return names[muscle] || muscle;
 };
 
+// Normalize legacy muscle group names from DB to the canonical 12-group system
+const LEGACY_MUSCLE_MAP: Record<string, string> = {
+  'back': 'upper back',
+  'quadriceps': 'quads',
+};
+
+const normalizeMuscle = (raw: string): string => {
+  const lower = raw.toLowerCase();
+  return LEGACY_MUSCLE_MAP[lower] || lower;
+};
+
 const TARGET_SESSIONS = 4; // Goal: 4 sessions per 2 weeks
 const ROLLING_DAYS = 14;
 
@@ -100,10 +111,10 @@ async function fetchTrainingFrequency(userId: string): Promise<MuscleFrequency[]
     throw new Error(exercisesError.message);
   }
 
-  // Create exercise ID to muscle group map
+  // Create exercise ID to muscle group map (normalizes legacy names)
   const exerciseToMuscle = new Map<string, string>();
   exercises?.forEach((ex: any) => {
-    exerciseToMuscle.set(ex.id, ex.muscle_group?.toLowerCase());
+    exerciseToMuscle.set(ex.id, normalizeMuscle(ex.muscle_group || 'other'));
   });
 
   // Count unique sessions per muscle group

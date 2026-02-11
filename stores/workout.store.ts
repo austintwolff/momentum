@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { v4 as uuidv4 } from 'uuid';
 import { Exercise } from '@/types/database';
 import {
@@ -7,6 +10,85 @@ import {
   GoalBucket,
   checkForPR,
 } from '@/lib/points-engine';
+
+// Web storage adapter (same pattern as other stores)
+const webStorage: StateStorage = {
+  getItem: (name: string) => {
+    if (typeof window === 'undefined') return null;
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name: string, value: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      // Ignore storage errors
+    }
+  },
+  removeItem: (name: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.removeItem(name);
+    } catch {
+      // Ignore storage errors
+    }
+  },
+};
+
+// Custom storage that handles Date and Map serialization
+const baseStorage = Platform.OS === 'web'
+  ? webStorage
+  : (createJSONStorage(() => AsyncStorage) as unknown as StateStorage);
+
+const workoutStorage: StateStorage = {
+  getItem: async (name: string) => {
+    const raw = await baseStorage.getItem(name);
+    if (!raw) return raw;
+
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const state = parsed?.state;
+    if (!state?.activeWorkout) return raw;
+
+    // Rehydrate Date fields
+    if (state.activeWorkout.startedAt) {
+      state.activeWorkout.startedAt = new Date(state.activeWorkout.startedAt);
+    }
+
+    // Rehydrate muscleSetsCount from plain object back to Map
+    if (state.activeWorkout.muscleSetsCount && !(state.activeWorkout.muscleSetsCount instanceof Map)) {
+      state.activeWorkout.muscleSetsCount = new Map(Object.entries(state.activeWorkout.muscleSetsCount));
+    }
+
+    // Rehydrate completedAt in sets
+    for (const exercise of state.activeWorkout.exercises || []) {
+      for (const set of exercise.sets || []) {
+        if (set.completedAt) {
+          set.completedAt = new Date(set.completedAt);
+        }
+      }
+    }
+
+    return typeof raw === 'string' ? JSON.stringify(parsed) : parsed;
+  },
+  setItem: async (name: string, value: string) => {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    const state = parsed?.state;
+
+    if (state?.activeWorkout?.muscleSetsCount instanceof Map) {
+      state.activeWorkout.muscleSetsCount = Object.fromEntries(state.activeWorkout.muscleSetsCount);
+    }
+
+    const serialized = typeof value === 'string' ? JSON.stringify(parsed) : parsed;
+    return baseStorage.setItem(name, serialized);
+  },
+  removeItem: async (name: string) => {
+    return baseStorage.removeItem(name);
+  },
+};
 
 export interface WorkoutSet {
   id: string;
@@ -87,7 +169,9 @@ interface WorkoutState {
   tickRestTimer: () => void;
 }
 
-export const useWorkoutStore = create<WorkoutState>((set, get) => ({
+export const useWorkoutStore = create<WorkoutState>()(
+  persist(
+    (set, get) => ({
   activeWorkout: null,
   currentExerciseIndex: 0,
   isRestTimerActive: false,
@@ -457,4 +541,23 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       });
     }
   },
-}));
+    }),
+    {
+      name: 'momentum-active-workout',
+      storage: workoutStorage as any,
+      partialize: (state) => ({
+        activeWorkout: state.activeWorkout,
+        currentExerciseIndex: state.currentExerciseIndex,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state?.activeWorkout?.startedAt) {
+          const age = Date.now() - state.activeWorkout.startedAt.getTime();
+          if (age > 24 * 60 * 60 * 1000) {
+            state.activeWorkout = null;
+            state.currentExerciseIndex = 0;
+          }
+        }
+      },
+    }
+  )
+);

@@ -3,27 +3,13 @@ import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth.store';
 
 async function fetchTotalSets(userId: string): Promise<number> {
-  // Count all sets from completed workouts
+  // Count all sets from completed workouts using inner join + exact count
   const { count, error } = await (supabase
     .from('workout_sets') as any)
-    .select('id', { count: 'exact', head: true })
+    .select('id, workout_sessions!inner(user_id)', { count: 'exact', head: true })
     .eq('workout_sessions.user_id', userId);
 
   if (error) {
-    // Fallback: count directly from workout_sets with a join
-    const { data, error: fallbackError } = await (supabase
-      .from('workout_sets') as any)
-      .select(`
-        id,
-        workout_sessions!inner (
-          user_id
-        )
-      `)
-      .eq('workout_sessions.user_id', userId);
-
-    if (!fallbackError && data) {
-      return data.length;
-    }
     return 0;
   }
 

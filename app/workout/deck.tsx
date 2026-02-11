@@ -16,7 +16,7 @@ import { showAlert } from '@/lib/alert';
 import { colors } from '@/constants/Colors';
 import { useWorkoutStore } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
-import { useSettingsStore, lbsToKg, kgToLbs } from '@/stores/settings.store';
+import { useSettingsStore } from '@/stores/settings.store';
 import { saveWorkoutToDatabase, getTopRecentSetsForExercise, calculateE1RM, RecentTopSet, getUserTopAndRecentExercises } from '@/services/workout.service';
 import { syncAndFetchExercises, clearExerciseCache, deleteCustomExercise } from '@/services/exercise-sync.service';
 import ExercisePicker from '@/components/workout/ExercisePicker';
@@ -65,8 +65,8 @@ const CARD_GAP = 12;
 // Map workout type to muscle groups (same as ExercisePicker)
 const WORKOUT_MUSCLE_MAP: Record<string, string[]> = {
   'Push Day': ['Chest', 'Shoulders', 'Triceps'],
-  'Pull Day': ['Back', 'Biceps', 'Forearms'],
-  'Leg Day': ['Quadriceps', 'Hamstrings', 'Glutes', 'Calves'],
+  'Pull Day': ['Upper Back', 'Biceps', 'Forearms'],
+  'Leg Day': ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
   'Full Body': [], // Empty means all exercises
 };
 
@@ -83,16 +83,16 @@ function getWorkoutMuscleGroups(workoutName: string): string[] {
 // Map exercise muscle groups to the muscle_levels table format (lowercase)
 const MUSCLE_GROUP_MAP: Record<string, string> = {
   'Chest': 'chest',
-  'Back': 'upper back',
   'Upper Back': 'upper back',
   'Lower Back': 'lower back',
+  'Back': 'upper back', // legacy DB value
   'Shoulders': 'shoulders',
   'Biceps': 'biceps',
   'Triceps': 'triceps',
   'Forearms': 'forearms',
   'Core': 'core',
-  'Quadriceps': 'quads',
   'Quads': 'quads',
+  'Quadriceps': 'quads', // legacy DB value
   'Hamstrings': 'hamstrings',
   'Glutes': 'glutes',
   'Calves': 'calves',
@@ -136,7 +136,7 @@ const MUSCLE_DISPLAY_NAMES: Record<string, string> = {
   'triceps': 'Triceps',
   'forearms': 'Forearms',
   'core': 'Core',
-  'quads': 'Quadriceps',
+  'quads': 'Quads',
   'hamstrings': 'Hamstrings',
   'glutes': 'Glutes',
   'calves': 'Calves',
@@ -845,8 +845,8 @@ export default function ExerciseDeckScreen() {
       const converted: DetailedSet[] = deckItem.sets.map(s => {
         let displayWeight = '';
         if (s.weight !== null && s.weight !== undefined) {
-          const inUnit = weightUnit === 'lbs' ? kgToLbs(s.weight) : s.weight;
-          const perHand = isDumbbell ? inUnit / 2 : inUnit;
+          // Weight is already in display unit; only undo dumbbell doubling
+          const perHand = isDumbbell ? s.weight / 2 : s.weight;
           displayWeight = Math.round(perHand).toString();
         }
         return { id: s.id, reps: s.reps > 0 ? s.reps.toString() : '', weight: displayWeight, isComplete: true, isEdited: true };
@@ -884,17 +884,16 @@ export default function ExerciseDeckScreen() {
         const setsToSave = detailedSets
           .filter(s => s.reps || s.weight) // Only save sets with data
           .map((s, i) => {
-            let weightKg: number | null = null;
+            let weight: number | null = null;
             if (s.weight) {
               const parsed = parseFloat(s.weight);
-              // Convert from display unit to kg
-              const inKg = weightUnit === 'lbs' ? lbsToKg(parsed) : parsed;
-              // Double for dumbbells (user enters per-hand, we store total)
-              weightKg = exerciseIsDumbbell ? inKg * 2 : inKg;
+              // Store in display unit (like exercise-v2.tsx does)
+              // workout.service.ts handles the single lbs→kg conversion
+              weight = exerciseIsDumbbell ? parsed * 2 : parsed;
             }
             return {
               id: s.id,
-              weight: weightKg,
+              weight,
               reps: parseInt(s.reps) || 0,
               isWarmup: false,
             };

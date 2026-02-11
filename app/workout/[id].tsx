@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   View,
   Text,
@@ -108,6 +109,7 @@ export default function WorkoutDetailScreen() {
   const user = useAuthStore(s => s.user);
   const refreshUserStats = useAuthStore(s => s.refreshUserStats);
   const weightUnit = useSettingsStore(s => s.weightUnit);
+  const queryClient = useQueryClient();
 
   const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -163,9 +165,9 @@ export default function WorkoutDetailScreen() {
   const formatVolume = (volumeKg: number) => {
     const volume = weightUnit === 'lbs' ? kgToLbs(volumeKg) : volumeKg;
     if (volume >= 1000) {
-      return `${(volume / 1000).toFixed(1)}k ${weightUnit}`;
+      return `${(volume / 1000).toFixed(1)}k`;
     }
-    return `${Math.round(volume)} ${weightUnit}`;
+    return `${Math.round(volume).toLocaleString()}`;
   };
 
   const handleDeleteWorkout = () => {
@@ -183,6 +185,7 @@ export default function WorkoutDetailScreen() {
             const result = await deleteWorkout(id, user.id);
             if (result.success) {
               await refreshUserStats();
+              queryClient.invalidateQueries({ queryKey: ['dailyGoals'] });
               router.back();
             } else {
               showAlert('Error', result.error || 'Failed to delete workout');
@@ -275,7 +278,7 @@ export default function WorkoutDetailScreen() {
           <View style={styles.statCard}>
             <DumbbellIcon />
             <Text style={styles.statValue}>{formatVolume(workout.total_volume_kg)}</Text>
-            <Text style={styles.statLabel}>Volume</Text>
+            <Text style={styles.statLabel}>Volume ({weightUnit})</Text>
           </View>
 
           <View style={styles.statCard}>
@@ -296,7 +299,10 @@ export default function WorkoutDetailScreen() {
             </View>
 
             <View style={styles.setsContainer}>
-              {sets.sort((a, b) => a.set_number - b.set_number).map((set, index) => (
+              {sets
+                .filter((set) => set.reps > 0 || (set.weight_kg != null && set.weight_kg > 0))
+                .sort((a, b) => a.set_number - b.set_number)
+                .map((set, index) => (
                 <View key={set.id} style={styles.setRow}>
                   <Text style={styles.setNumber}>{index + 1}</Text>
                   <Text style={styles.setDetails}>

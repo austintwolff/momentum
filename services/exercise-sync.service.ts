@@ -79,7 +79,36 @@ async function performSync(): Promise<Exercise[]> {
       def => !existingNames.has(def.name.toLowerCase())
     );
 
-    // 3. Insert missing exercises (requires authenticated user for RLS)
+    // 3. Update exercises whose muscle_group doesn't match current definitions
+    //    (migrates old "Back" → "Upper Back"/"Lower Back", "Quadriceps" → "Quads")
+    const defaultsByName = new Map(
+      DEFAULT_EXERCISES.map(def => [def.name.toLowerCase(), def])
+    );
+
+    const exercisesToUpdate = dbExercises.filter(dbEx => {
+      const def = defaultsByName.get(dbEx.name.toLowerCase());
+      return def && dbEx.muscle_group !== def.muscleGroup;
+    });
+
+    if (exercisesToUpdate.length > 0 && user) {
+      console.log(`[ExerciseSync] Updating muscle_group for ${exercisesToUpdate.length} exercises`);
+
+      for (const dbEx of exercisesToUpdate) {
+        const def = defaultsByName.get(dbEx.name.toLowerCase())!;
+        const { error: updateError } = await (supabase
+          .from('exercises') as any)
+          .update({ muscle_group: def.muscleGroup })
+          .eq('id', dbEx.id);
+
+        if (updateError) {
+          console.error(`[ExerciseSync] Error updating ${dbEx.name}:`, updateError);
+        } else {
+          dbEx.muscle_group = def.muscleGroup;
+        }
+      }
+    }
+
+    // 4. Insert missing exercises (requires authenticated user for RLS)
     if (exercisesToInsert.length > 0) {
       if (!user) {
         console.warn('[ExerciseSync] No authenticated user, skipping insert');
@@ -115,7 +144,7 @@ async function performSync(): Promise<Exercise[]> {
       }
     }
 
-    // 4. Sort and return
+    // 5. Sort and return
     dbExercises.sort((a, b) => a.name.localeCompare(b.name));
 
     // If no exercises available (database empty, insert failed), use fallback

@@ -16,13 +16,14 @@ import { DEFAULT_EXERCISES } from '@/constants/exercises';
 
 const MUSCLE_GROUPS = [
   'Chest',
-  'Back',
+  'Upper Back',
+  'Lower Back',
   'Shoulders',
   'Biceps',
   'Triceps',
   'Forearms',
   'Core',
-  'Quadriceps',
+  'Quads',
   'Hamstrings',
   'Glutes',
   'Calves',

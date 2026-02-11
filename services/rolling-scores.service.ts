@@ -55,6 +55,7 @@ export const ROLLING_SCORES_CONFIG = {
     DEFAULT_BASELINE_LOAD: 60,
     MIN_RATIO: 0.50,
     MAX_RATIO: 1.25,
+    MIN_WORKOUTS_FOR_FULL_LOAD: 3,
   },
 
   // Consistency score weights
@@ -71,6 +72,17 @@ export const ROLLING_SCORES_CONFIG = {
 
 const db = supabase as any;
 
+// Normalize legacy muscle group names from DB to the canonical 12-group system
+const LEGACY_MUSCLE_MAP: Record<string, string> = {
+  'back': 'upper back',
+  'quadriceps': 'quads',
+};
+
+const normalizeMuscle = (raw: string): string => {
+  const lower = raw.toLowerCase();
+  return LEGACY_MUSCLE_MAP[lower] || lower;
+};
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -85,6 +97,7 @@ export interface LoadBreakdown {
   workingSets: number;
   loadVsBaselinePercent: number;
   exercisesCompleted: number;
+  frequencyFactor: number;
 }
 
 export interface ConsistencyBreakdown {
@@ -272,7 +285,7 @@ async function fetchWorkoutsWithSets(
       exercise_id: set.exercise_id,
       exercise_name: set.exercise?.name || 'Unknown',
       exercise_type: set.exercise?.exercise_type || 'weighted',
-      muscle_group: (set.exercise?.muscle_group || 'other').toLowerCase(),
+      muscle_group: normalizeMuscle(set.exercise?.muscle_group || 'other'),
       set_type: set.set_type,
       weight_kg: set.weight_kg,
       reps: set.reps,
@@ -646,7 +659,15 @@ async function calculateLoadScoreWithBreakdown(
 
   const { MIN_RATIO, MAX_RATIO } = ROLLING_SCORES_CONFIG.LOAD;
   const normalizedScore = (ratio - MIN_RATIO) / (MAX_RATIO - MIN_RATIO);
-  const score = Math.max(0, Math.min(1, normalizedScore));
+  const rawScore = Math.max(0, Math.min(1, normalizedScore));
+
+  // Dampen score when training frequency is very low
+  // Prevents a single comeback workout from showing 100
+  const frequencyFactor = Math.min(
+    workouts.length / ROLLING_SCORES_CONFIG.LOAD.MIN_WORKOUTS_FOR_FULL_LOAD,
+    1.0
+  );
+  const score = rawScore * frequencyFactor;
 
   return {
     score: Math.round(score * 100),
@@ -654,6 +675,7 @@ async function calculateLoadScoreWithBreakdown(
       workingSets: workingSetsCount,
       loadVsBaselinePercent: Math.round(ratio * 100),
       exercisesCompleted: exerciseIds.size,
+      frequencyFactor,
     },
   };
 }

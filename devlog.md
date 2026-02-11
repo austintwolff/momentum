@@ -337,3 +337,107 @@
 **Concepts:** Conditional UI rendering based on data ownership, Alert.alert with destructive style, cascading state cleanup (DB + store + local), RLS-safe delete with is_public guard
 
 ---
+
+---
+## [10:15] Fix double weight conversion bug in deck.tsx popup
+
+**What:** Removed `lbsToKg()` conversion from the ExerciseLogPopup save handler in deck.tsx, and removed the reverse `kgToLbs()` conversion when reopening completed sets. The popup now stores weights in display units (matching exercise-v2.tsx), letting workout.service.ts handle the single lbs→kg conversion.
+
+**Why:** The popup was converting lbs→kg before saving to the Zustand store, but workout.service.ts also converts lbs→kg for all store values — causing a double conversion that stored ~45% of the actual weight. This made the near-PR metric always show 0 because the closeness ratio between correctly-saved baselines and double-converted today values was far below the 0.98 threshold.
+
+**Files:** app/workout/deck.tsx
+
+**Concepts:** Unit conversion invariants, single-responsibility for data transforms, dual code path consistency, E1RM score calculation
+
+---
+
+---
+## [10:15] Persist active workout state across app kills
+
+**What:** Added Zustand `persist` middleware to `useWorkoutStore`, with a custom storage adapter that handles `Date` and `Map` serialization/deserialization. Workouts older than 24 hours are auto-discarded on rehydration.
+
+**Why:** The workout store was the only Zustand store without persistence — if the OS killed the app or the user force-quit mid-workout, all in-progress exercises, sets, and weights were lost with no recovery.
+
+**Files:** stores/workout.store.ts
+
+**Concepts:** Zustand persist middleware, AsyncStorage, custom StateStorage adapters, Map/Date JSON serialization, stale data expiration, partialize for selective persistence
+
+---
+
+---
+## [10:30] Fix volume alignment and 1000-sets cap on profile
+
+**What:** Moved the weight unit from the volume value into the label ("Volume (lbs)") so large values like "10.7k" don't cause stat card misalignment. Fixed `useTotalSets` to use `count: 'exact'` with `head: true` and an inner join instead of fetching all rows (which Supabase caps at 1000 by default).
+
+**Why:** The volume string "10.7k lbs" was too wide for the stat card, causing text wrapping and visual misalignment. The sets count always showed 1000 because the fallback query used `data.length` which hits Supabase's default 1000-row limit.
+
+**Files:** app/workout/[id].tsx, hooks/useTotalSets.ts
+
+**Concepts:** Supabase row limit (default 1000), PostgREST count: 'exact' with head: true, inner joins for filtered counts, responsive text layout in fixed-width cards
+
+---
+
+---
+## [10:45] Add PR indicator to set row checkbox
+
+**What:** Added a gold filled circle with "PR" text to the warmup toggle position in `SetRow` when a set is a personal record. Threaded `isPR` from the store through `LocalSet` in exercise-v2.tsx to the `SetRow` component.
+
+**Why:** Users had no visual feedback on which individual sets were PRs while viewing their logged exercises. The existing warmup circle was a natural place since PR sets are never warmups.
+
+**Files:** components/workout/SetRow.tsx, app/workout/exercise-v2.tsx
+
+**Concepts:** Conditional component rendering, prop threading through local state, visual state hierarchy (PR takes precedence over warmup toggle)
+
+---
+
+---
+## [14:30] Fix Load score spiking to 100 after training breaks
+
+**What:** Added a workout frequency dampener to the Load score calculation. When fewer than 3 workouts exist in the 14-day window, the raw score is scaled down proportionally (1 workout = max 33, 2 = max 67, 3+ = no change).
+
+**Why:** A single comeback workout after a 2+ week break could spike Load to 100 due to a sparse baseline and asymmetric intensity calculation. The dampener reflects that one workout in 14 days is inherently low-load regardless of intensity.
+
+**Files:** services/rolling-scores.service.ts
+
+**Concepts:** Rolling window scoring, frequency dampening, ratio normalization, preventing edge-case score inflation
+
+---
+
+---
+## [14:40] Hide 0x0 sets in workout history detail
+
+**What:** Filtered out sets with no logged data (0 weight and 0 reps) from the workout detail view. The total set count in the exercise summary still includes all sets.
+
+**Why:** Some sets don't have detailed weight/rep data logged. Showing "0lbs x 0" is noisy and unhelpful — hiding them keeps the history clean while the summary count stays accurate.
+
+**Files:** app/workout/[id].tsx
+
+**Concepts:** Defensive UI filtering, preserving aggregate counts while hiding empty data rows
+
+---
+
+---
+## [10:30] Unify muscle group taxonomy across the app
+
+**What:** Replaced the 11-group muscle taxonomy (with generic "Back" and "Quadriceps") with the 12-group taxonomy already used by the scoring system ("Upper Back", "Lower Back", "Quads"). Re-tagged all 16 back exercises by anatomy and added a DB migration step to exercise-sync that updates stale `muscle_group` values on app launch.
+
+**Why:** Training frequency showed 0% for upper back, lower back, and quads because "Back" exercises never matched "upper back"/"lower back" and "Quadriceps" never matched "quads". Unifying on a single taxonomy fixes the mismatch.
+
+**Files:** constants/exercises.ts, app/workout/create-custom.tsx, app/workout/edit-workout.tsx, app/workout/deck.tsx, components/workout/ExercisePicker.tsx, components/workout/AnimatedMuscleSection.tsx, services/exercise-sync.service.ts
+
+**Concepts:** Data taxonomy unification, exercise classification, database migration on sync, muscle group granularity
+
+---
+
+---
+## [10:45] Add legacy muscle group normalization for existing DB data
+
+**What:** Added `LEGACY_MUSCLE_MAP` normalization in `useTrainingFrequency.ts`, `rolling-scores.service.ts`, and `deck.tsx` so that old DB values (`"Back"` → `"upper back"`, `"Quadriceps"` → `"quads"`) are correctly mapped at read time, without depending on a DB migration that RLS may block.
+
+**Why:** The exercises table's UPDATE RLS policy only allows the `created_by` user to update rows. Public exercises may have been created by a different user/session, so the sync migration silently fails. Normalizing at read time ensures training frequency and scores work immediately for all existing workout data.
+
+**Files:** hooks/useTrainingFrequency.ts, services/rolling-scores.service.ts, app/workout/deck.tsx
+
+**Concepts:** RLS policy constraints, defensive data normalization, backwards compatibility, read-time migration
+
+---

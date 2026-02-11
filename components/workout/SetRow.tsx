@@ -6,6 +6,7 @@ interface SetRowProps {
   weight: string;
   reps: string;
   isWarmup: boolean;
+  isPR?: boolean;
   isBodyweight: boolean;
   weightUnit: 'lbs' | 'kg';
   weightIncrement: number;
@@ -20,6 +21,7 @@ export default function SetRow({
   weight,
   reps,
   isWarmup,
+  isPR,
   isBodyweight,
   weightUnit,
   weightIncrement,
@@ -108,18 +110,26 @@ export default function SetRow({
         </TouchableOpacity>
       </View>
 
-      {/* Warmup Toggle */}
-      <TouchableOpacity
-        style={styles.warmupToggle}
-        onPress={onWarmupToggle}
-        accessibilityLabel={isWarmup ? 'Mark as working set' : 'Mark as warmup set'}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: isWarmup }}
-      >
-        <View style={[styles.warmupCircle, isWarmup && styles.warmupCircleActive]}>
-          {isWarmup && <Text style={styles.warmupCheck}>W</Text>}
+      {/* Warmup Toggle / PR Indicator */}
+      {isPR ? (
+        <View style={styles.warmupToggle}>
+          <View style={[styles.warmupCircle, styles.prCircleActive]}>
+            <Text style={styles.prText}>PR</Text>
+          </View>
         </View>
-      </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.warmupToggle}
+          onPress={onWarmupToggle}
+          accessibilityLabel={isWarmup ? 'Mark as working set' : 'Mark as warmup set'}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: isWarmup }}
+        >
+          <View style={[styles.warmupCircle, isWarmup && styles.warmupCircleActive]}>
+            {isWarmup && <Text style={styles.warmupCheck}>W</Text>}
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -218,5 +228,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: colors.warning,
+  },
+  prCircleActive: {
+    borderColor: '#D4A017',
+    backgroundColor: '#D4A017',
+  },
+  prText: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
 });

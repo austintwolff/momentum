@@ -49,10 +49,10 @@ const EQUIPMENT_OPTIONS = ['Barbell', 'Dumbbell', 'Machine', 'Cable', 'None'] as
 // Map workout types to relevant muscle groups
 const WORKOUT_MUSCLE_MAP: Record<string, string[]> = {
   'Push Day': ['Chest', 'Shoulders', 'Triceps'],
-  'Pull Day': ['Back', 'Biceps', 'Forearms'],
-  'Leg Day': ['Quadriceps', 'Hamstrings', 'Glutes', 'Calves'],
-  'Upper Body': ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'],
-  'Lower Body': ['Quadriceps', 'Hamstrings', 'Glutes', 'Calves'],
+  'Pull Day': ['Upper Back', 'Biceps', 'Forearms'],
+  'Leg Day': ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  'Upper Body': ['Chest', 'Upper Back', 'Shoulders', 'Biceps', 'Triceps'],
+  'Lower Body': ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
   'Full Body': [], // Empty means all
 };
 

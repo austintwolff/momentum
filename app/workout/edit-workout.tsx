@@ -19,13 +19,14 @@ import { DEFAULT_WORKOUT_EXERCISES, getDefaultExerciseNames } from '@/constants/
 
 const MUSCLE_GROUPS = [
   'Chest',
-  'Back',
+  'Upper Back',
+  'Lower Back',
   'Shoulders',
   'Biceps',
   'Triceps',
   'Forearms',
   'Core',
-  'Quadriceps',
+  'Quads',
   'Hamstrings',
   'Glutes',
   'Calves',
@@ -34,9 +35,9 @@ const MUSCLE_GROUPS = [
 // Default workout muscle mappings
 const DEFAULT_WORKOUT_MUSCLES: Record<string, string[]> = {
   'Push': ['Chest', 'Shoulders', 'Triceps'],
-  'Pull': ['Back', 'Biceps', 'Forearms'],
-  'Legs': ['Quadriceps', 'Hamstrings', 'Glutes', 'Calves'],
-  'Full Body': ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Core', 'Quadriceps', 'Hamstrings', 'Glutes', 'Calves'],
+  'Pull': ['Upper Back', 'Biceps', 'Forearms'],
+  'Legs': ['Quads', 'Hamstrings', 'Glutes', 'Calves'],
+  'Full Body': ['Chest', 'Upper Back', 'Lower Back', 'Shoulders', 'Biceps', 'Triceps', 'Core', 'Quads', 'Hamstrings', 'Glutes', 'Calves'],
 };
 
 function CloseIcon({ size = 24, color = colors.textMuted }: { size?: number; color?: string }) {
