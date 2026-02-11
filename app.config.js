@@ -43,6 +43,15 @@ module.exports = () => ({
           "The app needs access to your photos to set a profile picture.",
       },
     ],
+    [
+      "@kingstinct/react-native-healthkit",
+      {
+        NSHealthShareUsageDescription:
+          "Momentum reads your health data to stay in sync with your fitness profile.",
+        NSHealthUpdateUsageDescription:
+          "Momentum saves your strength training workouts to Apple Health so they appear in Health and sync with apps like Oura.",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

@@ -13,6 +13,7 @@ import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import 'react-native-reanimated';
 
 import { useAuthStore } from '@/stores/auth.store';
+import { requestHealthKitAuthorization } from '@/services/healthkit.service';
 import { colors } from '@/constants/Colors';
 
 export {
@@ -77,6 +78,11 @@ export default function RootLayout() {
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Request HealthKit write permission (iOS only, no-op elsewhere)
+  useEffect(() => {
+    requestHealthKitAuthorization();
+  }, []);
 
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {

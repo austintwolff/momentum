@@ -15,6 +15,7 @@
   "dependencies": {
     "@expo/ngrok": "^4.1.3",
     "@expo/vector-icons": "^15.0.3",
+    "@kingstinct/react-native-healthkit": "^13.1.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.90.1",
@@ -22,7 +23,6 @@
     "base64-arraybuffer": "^1.0.2",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
-
     "expo-file-system": "~19.0.21",
     "expo-font": "~14.0.10",
     "expo-image-picker": "~17.0.10",
@@ -49,9 +49,9 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
-    "expo-dev-client": "~6.0.20",
     "@types/react": "~19.1.0",
     "@types/uuid": "^10.0.0",
+    "expo-dev-client": "~6.0.20",
     "gh-pages": "^6.3.0",
     "react-test-renderer": "19.1.0",
     "typescript": "~5.9.2"

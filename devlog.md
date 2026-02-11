@@ -441,3 +441,16 @@
 **Concepts:** RLS policy constraints, defensive data normalization, backwards compatibility, read-time migration
 
 ---
+
+---
+## [14:00] Add Apple Health integration for workout syncing
+
+**What:** Installed `@kingstinct/react-native-healthkit`, created `services/healthkit.service.ts` as a thin wrapper, added HealthKit plugin to `app.config.js`, wired `saveWorkoutToHealthKit` into the workout completion flow in `active.tsx`, and added authorization request on app launch in `_layout.tsx`.
+
+**Why:** Workouts existed in a silo with no cross-app visibility. Writing completed workouts to HealthKit as `traditionalStrengthTraining` samples gives automatic sync to Apple Health and downstream apps like Oura, with zero ongoing user effort. All HealthKit calls are wrapped in try/catch so failures never block the app.
+
+**Files:** services/healthkit.service.ts, app/workout/active.tsx, app/_layout.tsx, app.config.js, package.json
+
+**Concepts:** HealthKit API, native Expo config plugins, platform-gated code, non-blocking side effects, HKWorkout samples, dynamic imports for platform-specific modules
+
+---
