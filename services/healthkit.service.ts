@@ -1,37 +1,38 @@
 import { Platform } from 'react-native';
 
 /**
- * Thin wrapper around @kingstinct/react-native-healthkit.
+ * Thin wrapper around @kayzmann/expo-healthkit.
  * All calls are no-ops on non-iOS platforms.
- * Errors are caught and logged — HealthKit must never block the app flow.
+ * Every function is wrapped so HealthKit errors NEVER crash the app.
  */
 
-async function getHealthKit() {
+function getHealthKit() {
   if (Platform.OS !== 'ios') return null;
   try {
-    return await import('@kingstinct/react-native-healthkit');
+    // Static require so Expo modules resolve at bundle time (no dynamic import needed)
+    return require('@kayzmann/expo-healthkit');
   } catch {
     return null;
   }
 }
 
-export async function requestHealthKitAuthorization(): Promise<void> {
-  try {
-    const hk = await getHealthKit();
-    if (!hk) return;
+export function requestHealthKitAuthorization(): void {
+  // Fire-and-forget — runs async but caller doesn't await
+  setTimeout(async () => {
+    try {
+      const hk = getHealthKit();
+      if (!hk) return;
 
-    if (!hk.isHealthDataAvailable()) return;
+      if (!hk.isAvailable()) return;
 
-    await hk.requestAuthorization({
-      toShare: ['HKWorkoutTypeIdentifier'],
-      toRead: [],
-    });
-  } catch (e) {
-    console.warn('[HealthKit] Authorization request failed:', e);
-  }
+      await hk.requestAuthorization([], ['Workout']);
+    } catch (e) {
+      console.warn('[HealthKit] Authorization request failed:', e);
+    }
+  }, 0);
 }
 
-export async function saveWorkoutToHealthKit(params: {
+export function saveWorkoutToHealthKit(params: {
   startedAt: Date;
   completedAt: Date;
   durationSeconds: number;
@@ -39,28 +40,31 @@ export async function saveWorkoutToHealthKit(params: {
   exerciseCount: number;
   totalSets: number;
   totalVolumeKg: number;
-}): Promise<void> {
-  try {
-    const hk = await getHealthKit();
-    if (!hk) return;
+}): void {
+  // Fire-and-forget — deferred off the call stack entirely
+  setTimeout(async () => {
+    try {
+      const hk = getHealthKit();
+      if (!hk) return;
 
-    if (!hk.isHealthDataAvailable()) return;
+      if (!hk.isAvailable()) return;
 
-    await hk.saveWorkoutSample(
-      hk.WorkoutActivityType.traditionalStrengthTraining,
-      [], // no quantity samples — we skip calories to avoid inaccurate estimates
-      params.startedAt,
-      params.completedAt,
-      undefined, // no totals
-      {
-        HKMetadataKeyWorkoutBrandName: 'Momentum',
-        WorkoutName: params.workoutName,
-        ExerciseCount: String(params.exerciseCount),
-        TotalSets: String(params.totalSets),
-        TotalVolumeKg: String(Math.round(params.totalVolumeKg)),
-      },
-    );
-  } catch (e) {
-    console.warn('[HealthKit] Failed to save workout:', e);
-  }
+      await hk.saveWorkout({
+        startDate: Math.floor(params.startedAt.getTime() / 1000),
+        endDate: Math.floor(params.completedAt.getTime() / 1000),
+        duration: params.durationSeconds,
+        distance: 0,
+        calories: 0,
+        activityType: 'traditionalStrengthTraining',
+        metadata: {
+          WorkoutName: params.workoutName,
+          ExerciseCount: params.exerciseCount,
+          TotalSets: params.totalSets,
+          TotalVolumeKg: Math.round(params.totalVolumeKg),
+        },
+      });
+    } catch (e) {
+      console.warn('[HealthKit] Failed to save workout:', e);
+    }
+  }, 0);
 }

@@ -1,7 +1,7 @@
 module.exports = () => ({
   name: "Momentum",
   slug: "momentum",
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "momentum",
@@ -10,7 +10,7 @@ module.exports = () => ({
   splash: {
     image: "./assets/images/splash-icon.png",
     resizeMode: "contain",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#0a0a14",
   },
   ios: {
     supportsTablet: true,
@@ -22,7 +22,7 @@ module.exports = () => ({
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
-      backgroundColor: "#ffffff",
+      backgroundColor: "#0a0a14",
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
@@ -44,7 +44,7 @@ module.exports = () => ({
       },
     ],
     [
-      "@kingstinct/react-native-healthkit",
+      "@kayzmann/expo-healthkit",
       {
         NSHealthShareUsageDescription:
           "Momentum reads your health data to stay in sync with your fitness profile.",
