@@ -15,7 +15,6 @@ import { useWorkoutStore, WorkoutExercise } from '@/stores/workout.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { saveWorkoutToDatabase } from '@/services/workout.service';
-import { saveWorkoutToHealthKit } from '@/services/healthkit.service';
 import { GoalBucket } from '@/lib/points-engine';
 import ExercisePicker from '@/components/workout/ExercisePicker';
 import { colors } from '@/constants/Colors';
@@ -171,17 +170,6 @@ export default function ActiveWorkoutScreen() {
               if (!saveResult.success) {
                 console.error('Failed to save workout:', saveResult.error);
               }
-
-              // Sync to Apple Health (fire-and-forget — never blocks finish flow)
-              saveWorkoutToHealthKit({
-                startedAt: finishedWorkout.startedAt,
-                completedAt,
-                durationSeconds: elapsedRef.current,
-                workoutName: finishedWorkout.name,
-                exerciseCount: finishedWorkout.exercises.length,
-                totalSets: finishedWorkout.exercises.reduce((sum, ex) => sum + ex.sets.length, 0),
-                totalVolumeKg: finishedWorkout.totalVolume,
-              });
 
               // Refresh user stats
               await refreshUserStats();

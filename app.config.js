@@ -1,7 +1,7 @@
 module.exports = () => ({
   name: "Momentum",
   slug: "momentum",
-  version: "1.0.2",
+  version: "1.0.3",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "momentum",
@@ -41,15 +41,6 @@ module.exports = () => ({
       {
         photosPermission:
           "The app needs access to your photos to set a profile picture.",
-      },
-    ],
-    [
-      "@kayzmann/expo-healthkit",
-      {
-        NSHealthShareUsageDescription:
-          "Momentum reads your health data to stay in sync with your fitness profile.",
-        NSHealthUpdateUsageDescription:
-          "Momentum saves your strength training workouts to Apple Health so they appear in Health and sync with apps like Oura.",
       },
     ],
   ],
